@@ -43,7 +43,7 @@ function submit($total) {
   $temp /= count($total);
   $volt /= count($total);
 
-  echo date('c') . 'POST PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
+  echo date('c') . ' POST PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
     $temp . 'C v6=' .  $volt . 'V' . PHP_EOL;
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
