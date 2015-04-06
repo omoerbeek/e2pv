@@ -32,22 +32,26 @@ $total = array();
 $last = 0;
 
 function submit($total) {
-  $sum = 0.0;
+  $e = 0.0;
+  $p = 0.0;
   $temp = 0.0;
   $volt = 0.0;
   foreach ($total as $t) {
-    $sum += $t['p'];
+    $e += $t['e'];
+    $p += $t['p'];
     $temp += $t['t'];
     $volt += $t['v'];
   }
   $temp /= count($total);
   $volt /= count($total);
 
-  echo date('c') . ' TOTAL = ' . $sum . PHP_EOL;
+  echo date('c') . ' v1=' . $e . 'Wh v2=' . $p . 'W v5=' . $temp . 'C v6=' .
+    $volt . 'V' . PHP_EOL;
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
-    'v1' => $sum,
+    'v1' => $e,
+    'v2' => $p,
     'v5' => $temp,
     'v6' => $volt,
     'c1' => 1);
@@ -99,9 +103,8 @@ function process($socket) {
           $v['ACVolt'] . 'V ' .  $v['ACFreq'] . 'Hz '  .  $ACpower . 'W ' .
           'E=' . $v['Efficiency'] .  ' T=' .  $v['Temperature'] .
           'C L=' . $LifeWh/1000 . 'kWh' . PHP_EOL;
-        $total[$v['IDDec']]['p'] = $LifeWh;
-        $total[$v['IDDec']]['t'] = $v['Temperature'];
-        $total[$v['IDDec']]['v'] = $v['ACVolt'];
+        $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
+          'v' => $v['ACVolt'], 't' => $v['Temperature']);
         if ($last < time() - 600 && count($total) == PANELCOUNT) {
           submit($total);
           $last = time();
