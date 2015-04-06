@@ -15,11 +15,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-// $Id: enecsys.php,v 1.2 2015/04/05 20:08:36 otto Exp $
-
 require_once 'config.php';
 // Example to put in config.php:
-// define('PANELCOUNT', 4);
+// define('IDCOUNT', 4);
 // define('APIKEY', 'PVOutput hex api key');
 // define('SYSTEMID', 'PVOutput system id');
 
@@ -105,7 +103,7 @@ function process($socket) {
           'C L=' . $LifeWh/1000 . 'kWh' . PHP_EOL;
         $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
           'v' => $v['ACVolt'], 't' => $v['Temperature']);
-        if ($last < time() - 600 && count($total) == PANELCOUNT) {
+        if ($last < time() - 600 && count($total) == IDCOUNT) {
           submit($total);
           $last = time();
         }
