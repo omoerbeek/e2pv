@@ -66,7 +66,10 @@ function submit($total) {
     'content' => $data));
   $context = stream_context_create($ctx);
   $fp = fopen($url, 'r', false, $context);
-  fclose($fp);
+  if (!$fp)
+    echo 'POST failed, check your APIKEY and SYSTEMID' . PHP_EOL;
+  else
+    fclose($fp);
 }
 
 function process($socket) {
@@ -103,6 +106,9 @@ function process($socket) {
           'C L=' . $LifeWh/1000 . 'kWh' . PHP_EOL;
         $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
           'v' => $v['ACVolt'], 't' => $v['Temperature']);
+        if (count($total) != IDCOUNT)
+          echo 'Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' . count($total) .
+           ' IDs sofar' .  PHP_EOL;
         if ($last < time() - 600 && count($total) == IDCOUNT) {
           submit($total);
           $last = time();
