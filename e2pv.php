@@ -40,10 +40,10 @@ function submit($total) {
     $temp += $t['t'];
     $volt += $t['v'];
   }
-  $temp /= count($total);
-  $volt /= count($total);
+  $temp /= round(count($total), 1);
+  $volt /= round(count($total), 1);
 
-  echo date('c') . ' POST PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
+  echo date('c') . ' => PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
     $temp . 'C v6=' .  $volt . 'V' . PHP_EOL;
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
@@ -97,12 +97,12 @@ function process($socket) {
         $v['DCCurrent'] *= 0.025;
         $v['Efficiency'] *= 0.001;
         $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
-        $ACpower = $v['DCPower'] * $v['Efficiency'];
+        $ACpower = round($v['DCPower'] * $v['Efficiency'], 2);
         $DCVolt = round($v['DCPower'] / $v['DCCurrent'], 2);
         echo $v['IDDec'] . ' DC=' . $v['DCPower']  . 'W ' .
-          $DCVolt . 'V ' . $v['DCCurrent'] . 'A ' . 'AC=' .
-          $v['ACVolt'] . 'V ' .  $v['ACFreq'] . 'Hz '  .  $ACpower . 'W ' .
-          'E=' . $v['Efficiency'] .  ' T=' .  $v['Temperature'] .
+          $DCVolt . 'V ' . round($v['DCCurrent'], 2) . 'A ' . 'AC=' .
+          $v['ACVolt'] . 'V ' .  $ACpower . 'W ' .
+          'E=' . round($v['Efficiency'], 2) .  ' T=' .  $v['Temperature'] .
           'C L=' . $LifeWh/1000 . 'kWh' . PHP_EOL;
         $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
           'v' => $v['ACVolt'], 't' => $v['Temperature']);
