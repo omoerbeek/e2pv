@@ -40,11 +40,11 @@ function submit($total) {
     $temp += $t['t'];
     $volt += $t['v'];
   }
-  $temp /= round(count($total), 1);
-  $volt /= round(count($total), 1);
+  $temp /= count($total);
+  $volt /= count($total);
 
   echo date('c') . ' => PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
-    $temp . 'C v6=' .  $volt . 'V' . PHP_EOL;
+    round($temp, 1) . 'C v6=' .  round($volt, 1) . 'V' . PHP_EOL;
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
