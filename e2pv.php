@@ -43,8 +43,8 @@ function submit($total) {
   $temp /= count($total);
   $volt /= count($total);
 
-  echo date('c') . ' => PVOutput v1=' . $e . 'Wh v2=' . $p . 'W v5=' .
-    round($temp, 1) . 'C v6=' .  round($volt, 1) . 'V' . PHP_EOL;
+  printf('%s => PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV' . PHP_EOL,
+         date('c'), $e, $p, $temp, $volt);
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
@@ -76,11 +76,14 @@ function process($socket) {
   global $total;
   global $last;
 
+  $i = 0;
   while (true) {
     $str = @socket_read($socket, 1024, PHP_NORMAL_READ);
     if ($str === false || strlen($str) == 0) {
         return;
     }
+    if ($i++ % 10 == 0)
+      socket_write($socket, "0E0000000000cgAD83\r");
     $str = str_replace(array("\n", "\r"), "", $str);
     //echo $str . PHP_EOL;
     $pos = strpos($str, 'WS');
@@ -99,16 +102,16 @@ function process($socket) {
         $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
         $ACpower = round($v['DCPower'] * $v['Efficiency'], 2);
         $DCVolt = round($v['DCPower'] / $v['DCCurrent'], 2);
-        echo $v['IDDec'] . ' DC=' . $v['DCPower']  . 'W ' .
-          $DCVolt . 'V ' . round($v['DCCurrent'], 2) . 'A ' . 'AC=' .
-          $v['ACVolt'] . 'V ' .  $ACpower . 'W ' .
-          'E=' . round($v['Efficiency'], 2) .  ' T=' .  $v['Temperature'] .
-          'C L=' . $LifeWh/1000 . 'kWh' . PHP_EOL;
+        printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d L=%.3fkWh' .
+               PHP_EOL,
+               $v['IDDec'], $v['DCPower'], $DCVolt, $v['DCCurrent'],
+               $v['ACVolt'], $ACpower,
+               $v['Efficiency'], $v['Temperature'], $LifeWh / 1000);
         $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
           'v' => $v['ACVolt'], 't' => $v['Temperature']);
         if (count($total) != IDCOUNT)
           echo 'Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' . count($total) .
-           ' IDs sofar' .  PHP_EOL;
+           ' IDs' .  PHP_EOL;
         if ($last < time() - 600 && count($total) == IDCOUNT) {
           submit($total);
           $last = time();
