@@ -68,8 +68,10 @@ function submit($total) {
   $fp = fopen($url, 'r', false, $context);
   if (!$fp)
     echo 'POST failed, check your APIKEY and SYSTEMID' . PHP_EOL;
-  else
+  else {
+    echo fread($fp, 100) . PHP_EOL;
     fclose($fp);
+  }
 }
 
 function process($socket) {
