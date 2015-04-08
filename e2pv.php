@@ -21,13 +21,18 @@ require_once 'config.php';
 // define('APIKEY', 'PVOutput hex api key');
 // define('SYSTEMID', 'PVOutput system id');
 
+function report($msg) {
+  echo date('Ymd-H:i:s') . ' ' . $msg . PHP_EOL;
+}
+
 function fatal($msg) {
-  echo $msg . ': ' . socket_strerror(socket_last_error()) . PHP_EOL;
+  report($msg . ': ' . socket_strerror(socket_last_error()));
   exit(1);
 }
 
 $total = array();
 $last = 0;
+$lastkeepalive = 0;
 
 function submit($total) {
   $e = 0.0;
@@ -43,8 +48,8 @@ function submit($total) {
   $temp /= count($total);
   $volt /= count($total);
 
-  printf('%s => PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV' . PHP_EOL,
-         date('c'), $e, $p, $temp, $volt);
+  report(sprintf('=> PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
+         $e, $p, $temp, $volt));
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
@@ -67,32 +72,55 @@ function submit($total) {
   $context = stream_context_create($ctx);
   $fp = fopen($url, 'r', false, $context);
   if (!$fp)
-    echo 'POST failed, check your APIKEY and SYSTEMID' . PHP_EOL;
+    report('POST failed, check your APIKEY and SYSTEMID');
   else {
-    echo fread($fp, 100) . PHP_EOL;
+    $reply = fread($fp, 100);
+    report('PVOutput replies: ' . $reply);
     fclose($fp);
   }
 }
 
-function process($socket) {
-  global $total;
-  global $last;
+$buf = '';
 
-  $i = 0;
+function reader($socket) {
+  global $buf;
   while (true) {
-    $str = @socket_read($socket, 1024, PHP_NORMAL_READ);
-    if ($str === false || strlen($str) == 0) {
+    $pos = strpos($buf, "\r");
+    if ($pos === false) {
+      $str = socket_read($socket, 128, PHP_NORMAL_READ);
+      if ($str === false || strlen($str) == 0)
+        return false;
+      $buf .= $str;
+      continue;
+    } else {
+      $str = substr($buf, 0, $pos + 1);
+      $buf = substr($buf, $pos + 2);
+      return $str;
+    }
+  }
+}
+
+function process($socket) {
+  global $total, $last, $lastkeepalive;
+
+  while (true) {
+    $str = reader($socket);
+    if ($str === false) {
         return;
     }
-    if ($i++ % 10 == 0)
-      socket_write($socket, "0E0000000000cgAD83\r");
+    if ($lastkeepalive < time() - 200) {
+      if (socket_write($socket, "0E0000000000cgAD83\r") === false)
+        return;
+      $lastkeepalive = time();
+      //report('send keepalive');
+    }
     $str = str_replace(array("\n", "\r"), "", $str);
-    //echo $str . PHP_EOL;
+    //report($str);
     $pos = strpos($str, 'WS');
     if ($pos !== false) {
         $sub = substr($str, $pos + 3);
         $sub = str_replace(array('-', '_' , '*'), array('+', '/' ,'='), $sub);
-        //echo strlen($sub) . ' ' . $sub . PHP_EOL;
+        //report(strlen($sub) . ' ' . $sub);
         $bin = base64_decode($sub);
         if (strlen($bin) != 42)
           continue;
@@ -112,8 +140,8 @@ function process($socket) {
         $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
           'v' => $v['ACVolt'], 't' => $v['Temperature']);
         if (count($total) != IDCOUNT)
-          echo 'Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' . count($total) .
-           ' IDs' .  PHP_EOL;
+          report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' . count($total) .
+           ' IDs');
         if ($last < time() - 600 && count($total) == IDCOUNT) {
           submit($total);
           $last = time();
@@ -141,8 +169,13 @@ function loop($socket) {
     $client = socket_accept($socket);
     if (!$client)
       fatal('socket_accept');
+    socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO,
+      array('sec' => 90, 'usec' => 0));
+    socket_getpeername($client, $peer);
+    report('Accepted connection from ' . $peer);
     process($client);
     socket_shutdown($client);
+    report('Connection closed'); 
   }
 }
 
