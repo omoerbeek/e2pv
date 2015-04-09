@@ -100,6 +100,39 @@ function reader($socket) {
   }
 }
 
+$link = false;
+
+function submit_mysql($v, $LifeWh) {
+  global $link;
+
+  if (!$link) {
+    $link = mysqli_connect(MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDB,
+      MYSQLPORT);
+  }
+  if (!$link) {
+    report('Cannot connect to MYSQL ' . mysqli_connect_error());
+    return;
+  }
+
+  $query = 'INSERT INTO enecsys(' .
+    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt) VALUES(' .
+    '%d, %d, %d, %f, %f, %d, %d)';
+  $q = sprintf($query,
+    mysqli_real_escape_string($link, $v['IDDec']),
+    mysqli_real_escape_string($link, $LifeWh),
+    mysqli_real_escape_string($link, $v['DCPower']),
+    mysqli_real_escape_string($link, $v['DCCurrent']),
+    mysqli_real_escape_string($link, $v['Efficiency']),
+    mysqli_real_escape_string($link, $v['ACFreq']),
+    mysqli_real_escape_string($link, $v['ACVolt']));
+
+  if (!mysqli_query($link, $q)) {
+   report('MYSQL insert failed: ' . mysqli_error($link));
+   mysqli_close($link);
+   $link = false;
+  }
+}
+
 function process($socket) {
   global $total, $last, $lastkeepalive;
 
@@ -146,6 +179,8 @@ function process($socket) {
           submit($total);
           $last = time();
         }
+        if (defined('MYSQLDB'))
+          submit_mysql($v, $LifeWh);
     }
   }
 }
