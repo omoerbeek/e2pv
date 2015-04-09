@@ -47,7 +47,7 @@ By default, the script will collect values from the configured number of
 inverters and submit aggregated data to PVOutput. It is possible to
 send the data from the individual inverters to PVOutput. Using the "Parent"
 feauture of PVOutput, a system can be defined that displays the aggregated
-data of all panels. Note that this feature is a /donation only/ feature.
+data of all inverters. Note that this feature is a *donation only* feature.
 
 An example config.php snippet for a split configuration:
 
