@@ -43,11 +43,11 @@ define('MYSQLPORT', '3306');
 ```
 
 # Aggregation
-By default, the script will collect values from the configged number of
-panels and submit aggrgated data to PVOutput. But it is possible to
+By default, the script will collect values from the configured number of
+inverters and submit aggregated data to PVOutput. It is possible to
 send the data from the individual inverters to PVOutput. Using the "Parent"
-feauture of PVOutput, a system can be defined that displays the aggragated
-data of all panels. Note that this feature is a donation only feature.
+feauture of PVOutput, a system can be defined that displays the aggregated
+data of all panels. Note that this feature is a /donation only/ feature.
 
 An example config.php snippet for a split configuration:
 
