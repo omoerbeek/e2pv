@@ -41,3 +41,33 @@ define('MYSQLPASSWORD', 'mypw');
 define('MYSQLDB', 'mydbname');
 define('MYSQLPORT', '3306');
 ```
+
+# Aggregation
+By default, the script will collect values from the configged number of
+panels and submit aggrgated data to PVOutput. But it is possible to
+send the data from the individual inverters to PVOutput. Using the "Parent"
+feauture of PVOutput, a system can be defined that displays the aggragated
+data of all panels. Note that this feature is a donation only feature.
+
+An example config.php snippet for a split configuration:
+
+```php
+<?php
+define('IDCOUNT', 4);
+define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
+define('SYSTEMID', 'NNNNNN');
+
+define('MODE', 'SPLIT'); // 'AGGREGATE' or 'SPLIT'
+
+// If mode is SPLIT, define the Enecsys ID to PVOutput SystemID mapping for each
+// inverter.
+$systemid = array(
+  A => X,
+  B => Y,
+  C => Z,
+  D => W,
+);
+?>
+```
+`A-D` are Enecsys IDs, `W-Z` are PVOutput SystemIDs. Data for inverter `A` will
+be sent to PVOutput SystemID `X`, etc.

@@ -34,7 +34,7 @@ $total = array();
 $last = 0;
 $lastkeepalive = 0;
 
-function submit($total) {
+function submit($total, $systemid) {
   $e = 0.0;
   $p = 0.0;
   $temp = 0.0;
@@ -61,7 +61,7 @@ function submit($total) {
   $headers = array(
     "Content-type: application/x-www-form-urlencoded",
     'X-Pvoutput-Apikey: ' . APIKEY,
-    'X-Pvoutput-SystemId: ' . SYSTEMID);
+    'X-Pvoutput-SystemId: ' . $systemid);
   $url = 'http://pvoutput.org/service/r2/addstatus.jsp';
   
   $data = http_build_query($data);
@@ -134,7 +134,7 @@ function submit_mysql($v, $LifeWh) {
 }
 
 function process($socket) {
-  global $total, $last, $lastkeepalive;
+  global $total, $last, $lastkeepalive, $systemid;
 
   while (true) {
     $str = reader($socket);
@@ -165,19 +165,30 @@ function process($socket) {
         $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
         $ACpower = round($v['DCPower'] * $v['Efficiency'], 2);
         $DCVolt = round($v['DCPower'] / $v['DCCurrent'], 2);
+        $id = $v['IDDec'];
         printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d L=%.3fkWh' .
                PHP_EOL,
-               $v['IDDec'], $v['DCPower'], $DCVolt, $v['DCCurrent'],
+               $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
                $v['ACVolt'], $ACpower,
                $v['Efficiency'], $v['Temperature'], $LifeWh / 1000);
-        $total[$v['IDDec']] = array('e' => $LifeWh, 'p' => $v['DCPower'],
-          'v' => $v['ACVolt'], 't' => $v['Temperature']);
-        if (count($total) != IDCOUNT)
-          report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' . count($total) .
-           ' IDs');
-        if ($last < time() - 600 && count($total) == IDCOUNT) {
-          submit($total);
-          $last = time();
+        $total[$id]['e'] = $LifeWh;
+        $total[$id]['p'] = $v['DCPower'];
+        $total[$id]['v'] = $v['ACVolt'];
+        $total[$id]['t'] = $v['Temperature'];
+	if (MODE == 'SPLIT') {
+	  if (!isset($total[$id]['ts']) || $total[$id]['ts'] < time() - 600) {
+            submit(array($total[$id]), $systemid[$id]);
+            $total[$id]['ts'] = time();
+          }
+        } else {
+          if (count($total) != IDCOUNT) {
+            report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
+             count($total) .  ' IDs');
+          }
+          if ($last < time() - 600 && count($total) == IDCOUNT) {
+            submit($total, SYSTEMID);
+            $last = time();
+          }
         }
         if (defined('MYSQLDB'))
           submit_mysql($v, $LifeWh);
@@ -214,6 +225,11 @@ function loop($socket) {
   }
 }
 
+if (MODE == 'SPLIT' && count($systemid) != IDCOUNT) {
+  report('In SPLIT mode, define IDCOUNT systemid mappings');
+  exit(1);
+}
+  
 $socket = setup();
 loop($socket);
 socket_close($socket);

@@ -3,6 +3,17 @@ define('IDCOUNT', N);
 define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
 define('SYSTEMID', 'NNNNNN');
 
+define('MODE', 'AGGREGATE'); // 'AGGREGATE' or 'SPLIT'
+
+// If mode is SPLIT, define the Enecsys ID to PVOutput SystemID mapping for each
+// inverter.
+//$systemid = array(
+//  NNNNNNNNN => NNNNNN,
+//  NNNNNNNNN => NNNNNN,
+//  ...
+//);
+
+
 // Optional MySQL defs, uncomment to enable MySQL inserts, see README.md
 //define('MYSQLHOST', 'localhost');
 //define('MYSQLUSER', 'myuser');
