@@ -6,7 +6,7 @@ php needs to be installed with the mysqli extension enabled.
 
 Create a database and define a table:
 
-[pre]
+```MySQL
 CREATE TABLE enecsys (
   ts TIMESTAMP NOT NULL,
   id INT NOT NULL,
@@ -18,12 +18,14 @@ CREATE TABLE enecsys (
   acvolt INT NOT NULL,
   KEY (ts, id)
 );
-[/pre]
+````
 
 You need to set the MYSQL defines in config.php, for example:
 
+```php
 define('MYSQLHOST', 'localhost');
 define('MYSQLUSER', 'myuser');
 define('MYSQLPASSWORD', 'mypw');
 define('MYSQLDB', 'mydbname');
 define('MYSQLPORT', '3306');
+```
