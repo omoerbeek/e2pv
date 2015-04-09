@@ -62,12 +62,9 @@ define('MODE', 'SPLIT'); // 'AGGREGATE' or 'SPLIT'
 // If mode is SPLIT, define the Enecsys ID to PVOutput SystemID mapping for each
 // inverter.
 $systemid = array(
-  A => X,
-  B => Y,
-  C => Z,
-  D => W,
+  120069930 => 123456,
+  // three more
 );
 ?>
 ```
-`A-D` are Enecsys IDs, `W-Z` are PVOutput SystemIDs. Data for inverter `A` will
-be sent to PVOutput SystemID `X`, etc.
+Data for inverter `120069930` will be sent to PVOutput SystemID `123456`, etc.
