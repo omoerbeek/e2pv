@@ -1,6 +1,18 @@
 # e2pv
 Listen to Enecsys Gateway posts and sends data to PVOutput
 
+# Setup
+Edit the configuration file config.php. 
+```php
+<?php
+define('IDCOUNT', N);
+define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
+define('SYSTEMID', 'NNNNNN');
+?>
+```
+IDCount needs to be set to the number of inverters you have. APIKEY and
+SYSTEMID correspond to your PVOutput api key and System ID.
+
 # Optional MySQL support
 php needs to be installed with the mysqli extension enabled.
 
