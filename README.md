@@ -13,9 +13,9 @@ define('LIFETIME', 1);
 ```
 `IDCOUNT` needs to be set to the number of inverters you have. `APIKEY` and
 `SYSTEMID` correspond to your PVOutput api key and System ID.
-`LIFETIME` should be set to `0` if your lifetime Kwh values produce wrong
+`LIFETIME` should be set to `0` if your lifetime kWh values produce wrong
 values. That seems to happen in some installations when panels are producing 
-close to that maximum capacity.
+close to their maximum capacity.
 
 # Optional MySQL support
 php needs to be installed with the mysqli extension enabled.
