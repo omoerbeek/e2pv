@@ -21,6 +21,9 @@ require_once 'config.php';
 // define('APIKEY', 'PVOutput hex api key');
 // define('SYSTEMID', 'PVOutput system id');
 
+if (!defined('LIFETIME'))
+  define('LIFETIME', 1);
+
 function report($msg) {
   echo date('Ymd-H:i:s') . ' ' . $msg . PHP_EOL;
 }
@@ -48,16 +51,22 @@ function submit($total, $systemid) {
   $temp /= count($total);
   $volt /= count($total);
 
-  report(sprintf('=> PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
-         $e, $p, $temp, $volt));
+  if (LIFETIME)
+    report(sprintf('=> PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
+      $e, $p, $temp, $volt));
+  else
+    report(sprintf('=> PVOutput v2=%dW v5=%.1fC v6=%.1fV', $p, $temp, $volt));
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
-    'v1' => $e,
     'v2' => $p,
     'v5' => $temp,
-    'v6' => $volt,
-    'c1' => 1);
+    'v6' => $volt
+  );
+  if (LIFETIME) {
+    $data['v1'] = $e;
+    $data['c1'] = 1;
+  }
   $headers = array(
     "Content-type: application/x-www-form-urlencoded",
     'X-Pvoutput-Apikey: ' . APIKEY,
@@ -115,8 +124,8 @@ function submit_mysql($v, $LifeWh) {
   }
 
   $query = 'INSERT INTO enecsys(' .
-    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt, temp) VALUES(' .
-    '%d, %d, %d, %f, %f, %d, %d, %d)';
+    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt) VALUES(' .
+    '%d, %d, %d, %f, %f, %d, %d)';
   $q = sprintf($query,
     mysqli_real_escape_string($link, $v['IDDec']),
     mysqli_real_escape_string($link, $LifeWh),
@@ -124,8 +133,7 @@ function submit_mysql($v, $LifeWh) {
     mysqli_real_escape_string($link, $v['DCCurrent']),
     mysqli_real_escape_string($link, $v['Efficiency']),
     mysqli_real_escape_string($link, $v['ACFreq']),
-    mysqli_real_escape_string($link, $v['ACVolt']),
-    mysqli_real_escape_string($link, $v['Temperature']));
+    mysqli_real_escape_string($link, $v['ACVolt']));
 
   if (!mysqli_query($link, $q)) {
    report('MYSQL insert failed: ' . mysqli_error($link));
