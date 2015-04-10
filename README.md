@@ -28,6 +28,7 @@ CREATE TABLE enecsys (
   efficiency float NOT NULL,
   acfreq INT NOT NULL,
   acvolt INT NOT NULL,
+  temp INT NOT NULL,
   KEY (ts, id)
 );
 ````

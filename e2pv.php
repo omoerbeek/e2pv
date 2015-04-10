@@ -115,8 +115,8 @@ function submit_mysql($v, $LifeWh) {
   }
 
   $query = 'INSERT INTO enecsys(' .
-    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt) VALUES(' .
-    '%d, %d, %d, %f, %f, %d, %d)';
+    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt, temp) VALUES(' .
+    '%d, %d, %d, %f, %f, %d, %d, %d)';
   $q = sprintf($query,
     mysqli_real_escape_string($link, $v['IDDec']),
     mysqli_real_escape_string($link, $LifeWh),
@@ -124,6 +124,7 @@ function submit_mysql($v, $LifeWh) {
     mysqli_real_escape_string($link, $v['DCCurrent']),
     mysqli_real_escape_string($link, $v['Efficiency']),
     mysqli_real_escape_string($link, $v['ACFreq']),
+    mysqli_real_escape_string($link, $v['Temperature']),
     mysqli_real_escape_string($link, $v['ACVolt']));
 
   if (!mysqli_query($link, $q)) {
