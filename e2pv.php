@@ -124,8 +124,8 @@ function submit_mysql($v, $LifeWh) {
     mysqli_real_escape_string($link, $v['DCCurrent']),
     mysqli_real_escape_string($link, $v['Efficiency']),
     mysqli_real_escape_string($link, $v['ACFreq']),
-    mysqli_real_escape_string($link, $v['Temperature']),
-    mysqli_real_escape_string($link, $v['ACVolt']));
+    mysqli_real_escape_string($link, $v['ACVolt']),
+    mysqli_real_escape_string($link, $v['Temperature']));
 
   if (!mysqli_query($link, $q)) {
    report('MYSQL insert failed: ' . mysqli_error($link));
