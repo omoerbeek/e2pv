@@ -3,7 +3,7 @@ define('IDCOUNT', N);
 define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
 define('SYSTEMID', 'NNNNNN');
 
-define('LIFETIME', 1);       // see README
+define('LIFETIME', 1);       // see README.md
 define('MODE', 'AGGREGATE'); // 'AGGREGATE' or 'SPLIT'
 
 // If mode is SPLIT, define the Enecsys ID to PVOutput SystemID mapping for each

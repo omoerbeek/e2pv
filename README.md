@@ -1,8 +1,20 @@
 # e2pv
-Listen to Enecsys Gateway posts and sends data to PVOutput
+`e2pb.php` is a php script that listens to Enecsys Gateway (V1)
+posts and sends data to PVOutput.
 
+First, setup an PVOutput account with API access enabled. Define a system,
+making sure that in the Live Settings section Status Interval is set to 10min
+and Timezone set to your local time zone.
+
+The script is run as a php command line script, no webserver is involved.
+The following settings need to be in `php.ini` (adapting the timezone to your
+setup):
+```php
+date.timezone=Europe/Amsterdam
+allow_url_fopen = On
+```
 # Setup
-Edit the configuration file config.php. 
+Edit the configuration file `config.php`. 
 ```php
 <?php
 define('IDCOUNT', N);
