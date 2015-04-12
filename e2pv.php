@@ -68,13 +68,12 @@ function submit($total, $systemid) {
     $data['v1'] = $e;
     $data['c1'] = 1;
   }
-  $headers = array(
-    "Content-type: application/x-www-form-urlencoded",
-    'X-Pvoutput-Apikey: ' . APIKEY,
-    'X-Pvoutput-SystemId: ' . $systemid);
+  $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
+    'X-Pvoutput-Apikey: ' . APIKEY . "\r\n" .
+    'X-Pvoutput-SystemId: ' . $systemid . "\r\n";
   $url = 'http://pvoutput.org/service/r2/addstatus.jsp';
   
-  $data = http_build_query($data);
+  $data = http_build_query($data, '', '&');
   $ctx = array('http' => array(
     'method' => 'POST',
     'header' => $headers,
