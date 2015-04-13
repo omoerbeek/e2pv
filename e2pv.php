@@ -225,23 +225,31 @@ function setup() {
   $ok = socket_bind($socket, '0.0.0.0', 5040);
   if (!$ok) 
     fatal('socket_bind');
-  $ok = socket_listen($socket);
+  $ok = socket_listen($socket, 1);
   if (!$ok)
     fatal('socket_listen');
   return $socket;
 }
 
 function loop($socket) {
+  $errcount = 0;
   while (true) {
     $client = socket_accept($socket);
-    if (!$client)
-      fatal('socket_accept');
+    if (!$client) {
+      report('Socket_accept: ' . socket_strerror(socket_last_error()));
+      if (++$errcount > 100)
+	fatal('Too many socket_accept errors in a row');
+      else
+        continue;
+    }
+    $errcount = 0;
     socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO,
       array('sec' => 90, 'usec' => 0));
+    socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
     socket_getpeername($client, $peer);
     report('Accepted connection from ' . $peer);
     process($client);
-    socket_shutdown($client);
+    socket_close($client);
     report('Connection closed'); 
   }
 }
