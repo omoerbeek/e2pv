@@ -43,10 +43,10 @@ function submit($total, $systemid) {
   $temp = 0.0;
   $volt = 0.0;
   foreach ($total as $t) {
-    $e += $t['e'];
-    $p += (double)$t['p'] / $t['c'];
-    $temp += $t['t'];
-    $volt += $t['v'];
+    $e += $t['Energy'];
+    $p += (double)$t['Power'] / $t['Count'];
+    $temp += $t['Temperature'];
+    $volt += $t['Volt'];
   }
   $temp /= count($total);
   $volt /= count($total);
@@ -175,39 +175,48 @@ function process($socket) {
         $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
         $ACpower = round($v['DCPower'] * $v['Efficiency'], 2);
         $DCVolt = round($v['DCPower'] / $v['DCCurrent'], 2);
+
         $id = $v['IDDec'];
-        $total[$id]['e'] = $LifeWh;
-        if (!isset($total[$id]['p'])) {
-          $total[$id]['p'] = 0;
-          $total[$id]['c'] = 0;
+        $time = time();
+        $total[$id]['TS'] = $time;
+        $total[$id]['Energy'] = $LifeWh;
+        if (!isset($total[$id]['Power'])) {
+          $total[$id]['Power'] = 0;
+          $total[$id]['Count'] = 0;
         }
-        $total[$id]['c']++;
-        $total[$id]['p'] += $v['DCPower'];
-        $total[$id]['v'] = $v['ACVolt'];
-        $total[$id]['t'] = $v['Temperature'];
+        $total[$id]['Count']++;
+        $total[$id]['Power'] += $v['DCPower'];
+        $total[$id]['Volt'] = $v['ACVolt'];
+        $total[$id]['Temperature'] = $v['Temperature'];
+
+        // Clear stale entries
+        foreach ($total as $key => $t) {
+          if ($total[$key]['TS'] < $time - 3600)
+            unset($total[$key]);
+        }
+
         printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
           'L=%.3fkWh' .  PHP_EOL,
           $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
           $v['ACVolt'], $ACpower,
           $v['Efficiency'], $v['Temperature'], $LifeWh / 1000);
         if (MODE == 'SPLIT') {
-          if (!isset($total[$id]['ts']) || $total[$id]['ts'] < time() - 600) {
+          if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
             submit(array($total[$id]), $systemid[$id]);
-            $total[$id]['ts'] = time();
-            $total[$id]['p'] = 0;
-            $total[$id]['c'] = 0;
+            $total[$id]['Power'] = 0;
+            $total[$id]['Count'] = 0;
           }
         } else {
           if (count($total) != IDCOUNT) {
             report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
               count($total) . ' IDs');
           }
-          if ($last < time() - 600 && count($total) == IDCOUNT) {
+          if ($last < $time - 600 && count($total) == IDCOUNT) {
             submit($total, SYSTEMID);
-            $last = time();
+            $last = $time;
             foreach ($total as $k => $t) {
-              $total[$k]['p'] = 0;
-              $total[$k]['c'] = 0;
+              $total[$k]['Power'] = 0;
+              $total[$k]['Count'] = 0;
             }
           }
         }
@@ -238,7 +247,7 @@ function loop($socket) {
     if (!$client) {
       report('Socket_accept: ' . socket_strerror(socket_last_error()));
       if (++$errcount > 100)
-	fatal('Too many socket_accept errors in a row');
+        fatal('Too many socket_accept errors in a row');
       else
         continue;
     }
