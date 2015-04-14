@@ -63,7 +63,7 @@ define('MYSQLDB', 'mydbname');
 define('MYSQLPORT', '3306');
 ```
 
-# Aggregation bs Splitting
+# Aggregation vs Splitting
 By default, the script will collect values from the configured number of
 inverters and submit aggregated data to PVOutput. It is possible to
 send the data from the individual inverters to PVOutput. Using the "Parent"
