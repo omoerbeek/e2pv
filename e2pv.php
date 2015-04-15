@@ -197,7 +197,7 @@ function process($socket) {
         }
 
         printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
-          'E=%x L=%.3fkWh' .  PHP_EOL,
+          'S=%x L=%.3fkWh' .  PHP_EOL,
           $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
           $v['ACVolt'], $ACpower,
           $v['Efficiency'], $v['Temperature'], $v['ErrorState'],
