@@ -168,8 +168,9 @@ function process($socket) {
         if (strlen($bin) != 42)
           continue;
 
-        $v = unpack('VIDDec/c19dummy/nDCCurrent/nDCPower/nEfficiency/cACFreq/' .
-          'nACVolt/cTemperature/nWh/nkWh', $bin);
+        //echo bin2hex($bin) . PHP_EOL;
+        $v = unpack('VIDDec/c17dummy/nErrorState/nDCCurrent/nDCPower/' .
+           'nEfficiency/cACFreq/nACVolt/cTemperature/nWh/nkWh', $bin);
         $v['DCCurrent'] *= 0.025;
         $v['Efficiency'] *= 0.001;
         $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
@@ -196,10 +197,11 @@ function process($socket) {
         }
 
         printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
-          'L=%.3fkWh' .  PHP_EOL,
+          'E=%x L=%.3fkWh' .  PHP_EOL,
           $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
           $v['ACVolt'], $ACpower,
-          $v['Efficiency'], $v['Temperature'], $LifeWh / 1000);
+          $v['Efficiency'], $v['Temperature'], $v['ErrorState'],
+          $LifeWh / 1000);
         if (MODE == 'SPLIT') {
           if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
             submit(array($total[$id]), $systemid[$id]);
