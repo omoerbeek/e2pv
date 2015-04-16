@@ -21,23 +21,39 @@ require_once 'config.php';
 // define('APIKEY', 'PVOutput hex api key');
 // define('SYSTEMID', 'PVOutput system id');
 
+// In case LIFETIMNE is not define inb config.sys, default to LIFETIME mode
 if (!defined('LIFETIME'))
   define('LIFETIME', 1);
 
+/*
+ * Report a message
+ */
 function report($msg) {
   echo date('Ymd-H:i:s') . ' ' . $msg . PHP_EOL;
 }
 
+/*
+ * Fatal error, likely a configuration issue
+ */
 function fatal($msg) {
   report($msg . ': ' . socket_strerror(socket_last_error()));
   exit(1);
 }
 
+// array holding last received values per inverter, index by inverter id
 $total = array();
+// When did we last send to PVOUtput?
 $last = 0;
+// When did we last send a reply back?
 $lastkeepalive = 0;
 
+/*
+ * Compute aggregate info to send to PVOutput
+ * See http://pvoutput.org/help.html#api-addstatus
+ */
 function submit($total, $systemid) {
+  // Compute aggragated data: energy, power, avg temp avg volt
+  // Power is avg power over the reporting interval
   $e = 0.0;
   $p = 0.0;
   $temp = 0.0;
@@ -64,10 +80,14 @@ function submit($total, $systemid) {
     'v5' => $temp,
     'v6' => $volt
   );
+
+  // Only send cummulative total energy in LIFETIME mode
   if (LIFETIME) {
     $data['v1'] = $e;
     $data['c1'] = 1;
   }
+
+  // We have all the data, prepare POST to PVOutput
   $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
     'X-Pvoutput-Apikey: ' . APIKEY . "\r\n" .
     'X-Pvoutput-SystemId: ' . $systemid . "\r\n";
@@ -87,10 +107,28 @@ function submit($total, $systemid) {
     report('PVOutput replies: ' . $reply);
     fclose($fp);
   }
+
+  // Optionally, also to mysql
+  if (MODE == 'AGGREGATE' && defined('MYSQLDB')) {
+    $mvalues = array(
+     'IDDec' => 0,
+     'DCPower' => $p, 
+     'DCCurrent' => 0,
+     'Efficiency' => 0,
+     'ACFreq' => 0,
+     'ACVolt' => $volt,
+     'Temperature' => $temp,
+     'State' => 0
+    );
+    submit_mysql($mvalues, $e);
+  }
 }
 
-$buf = '';
 
+/*
+ * Read data from socket until a "\r" is seen
+ */
+$buf = '';
 function reader($socket) {
   global $buf;
   while (true) {
@@ -109,8 +147,10 @@ function reader($socket) {
   }
 }
 
+/*
+ * Submit data to MySQL
+ */
 $link = false;
-
 function submit_mysql($v, $LifeWh) {
   global $link;
 
@@ -119,13 +159,13 @@ function submit_mysql($v, $LifeWh) {
       MYSQLPORT);
   }
   if (!$link) {
-    report('Cannot connect to MYSQL ' . mysqli_connect_error());
+    report('Cannot connect to MySQL ' . mysqli_connect_error());
     return;
   }
 
   $query = 'INSERT INTO enecsys(' .
-    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt, temp) VALUES(' .
-    '%d, %d, %d, %f, %f, %d, %d, %d)';
+    'id, wh, dcpower, dccurrent, efficiency, acfreq, acvolt, temp, state) ' .
+     'VALUES(%d, %d, %d, %f, %f, %d, %f, %f, %d)';
   $q = sprintf($query,
     mysqli_real_escape_string($link, $v['IDDec']),
     mysqli_real_escape_string($link, $LifeWh),
@@ -134,15 +174,19 @@ function submit_mysql($v, $LifeWh) {
     mysqli_real_escape_string($link, $v['Efficiency']),
     mysqli_real_escape_string($link, $v['ACFreq']),
     mysqli_real_escape_string($link, $v['ACVolt']),
-    mysqli_real_escape_string($link, $v['Temperature']));
+    mysqli_real_escape_string($link, $v['Temperature']),
+    mysqli_real_escape_string($link, $v['State']));
 
   if (!mysqli_query($link, $q)) {
-   report('MYSQL insert failed: ' . mysqli_error($link));
+   report('MySQL insert failed: ' . mysqli_error($link));
    mysqli_close($link);
    $link = false;
   }
 }
 
+/*
+ * Loop processing lines from the gatway
+ */
 function process($socket) {
   global $total, $last, $lastkeepalive, $systemid;
 
@@ -151,6 +195,7 @@ function process($socket) {
     if ($str === false) {
         return;
     }
+    // Send a reply if the last reply is 200 seconds ago
     if ($lastkeepalive < time() - 200) {
       if (socket_write($socket, "0E0000000000cgAD83\r") === false)
         return;
@@ -159,75 +204,88 @@ function process($socket) {
     }
     $str = str_replace(array("\n", "\r"), "", $str);
     //report($str);
+
+    // If the string contains WS, we're interested
     $pos = strpos($str, 'WS');
     if ($pos !== false) {
-        $sub = substr($str, $pos + 3);
-        $sub = str_replace(array('-', '_' , '*'), array('+', '/' ,'='), $sub);
-        //report(strlen($sub) . ' ' . $sub);
-        $bin = base64_decode($sub);
-        if (strlen($bin) != 42)
-          continue;
+      $sub = substr($str, $pos + 3);
+      // Standard translation of base64 over www
+      $sub = str_replace(array('-', '_' , '*'), array('+', '/' ,'='), $sub);
+      //report(strlen($sub) . ' ' . $sub);
+      $bin = base64_decode($sub);
+      // Incomplete? skip
+      if (strlen($bin) != 42)
+        continue;
 
-        //echo bin2hex($bin) . PHP_EOL;
-        $v = unpack('VIDDec/c17dummy/nErrorState/nDCCurrent/nDCPower/' .
-           'nEfficiency/cACFreq/nACVolt/cTemperature/nWh/nkWh', $bin);
-        $v['DCCurrent'] *= 0.025;
-        $v['Efficiency'] *= 0.001;
-        $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
-        $ACpower = round($v['DCPower'] * $v['Efficiency'], 2);
-        $DCVolt = round($v['DCPower'] / $v['DCCurrent'], 2);
+      //echo bin2hex($bin) . PHP_EOL;
+      $v = unpack('VIDDec/c18dummy/CState/nDCCurrent/nDCPower/' .
+         'nEfficiency/cACFreq/nACVolt/cTemperature/nWh/nkWh', $bin);
+      $v['DCCurrent'] *= 0.025;
+      $v['Efficiency'] *= 0.001;
+      $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
+      $ACpower = $v['DCPower'] * $v['Efficiency'];
+      $DCVolt = $v['DCPower'] / $v['DCCurrent'];
 
-        $id = $v['IDDec'];
-        $time = time();
-        $total[$id]['TS'] = $time;
-        $total[$id]['Energy'] = $LifeWh;
-        if (!isset($total[$id]['Power'])) {
+      // Clear stale entries (older than 1 hour)
+      foreach ($total as $key => $t) {
+        if ($total[$key]['TS'] < $time - 3600)
+          unset($total[$key]);
+      }
+
+      $id = $v['IDDec'];
+      $time = time();
+      // Record in $total indexed by id: cummulative energy
+      $total[$id]['Energy'] = $LifeWh;
+      // Record in $total, indexed by id: count, cummulative power,
+      // volt and temp
+      if (!isset($total[$id]['Power'])) {
+        $total[$id]['Power'] = 0;
+        $total[$id]['Count'] = 0;
+      }
+      $total[$id]['Count']++;
+      $total[$id]['Power'] += $v['DCPower'];
+      $total[$id]['Volt'] = $v['ACVolt'];
+      $total[$id]['Temperature'] = $v['Temperature'];
+
+      printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
+        'S=%d L=%.3fkWh' .  PHP_EOL,
+        $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
+        $v['ACVolt'], $ACpower,
+        $v['Efficiency'], $v['Temperature'], $v['State'],
+        $LifeWh / 1000);
+
+      if (defined('MYSQLDB'))
+        submit_mysql($v, $LifeWh);
+
+      if (MODE == 'SPLIT') {
+        // time to report for this inverter?
+        if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
+          submit(array($total[$id]), $systemid[$id]);
           $total[$id]['Power'] = 0;
           $total[$id]['Count'] = 0;
         }
-        $total[$id]['Count']++;
-        $total[$id]['Power'] += $v['DCPower'];
-        $total[$id]['Volt'] = $v['ACVolt'];
-        $total[$id]['Temperature'] = $v['Temperature'];
-
-        // Clear stale entries
-        foreach ($total as $key => $t) {
-          if ($total[$key]['TS'] < $time - 3600)
-            unset($total[$key]);
-        }
-
-        printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
-          'S=%x L=%.3fkWh' .  PHP_EOL,
-          $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
-          $v['ACVolt'], $ACpower,
-          $v['Efficiency'], $v['Temperature'], $v['ErrorState'],
-          $LifeWh / 1000);
-        if (MODE == 'SPLIT') {
-          if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
-            submit(array($total[$id]), $systemid[$id]);
-            $total[$id]['Power'] = 0;
-            $total[$id]['Count'] = 0;
-          }
-        } else {
-          if (count($total) != IDCOUNT) {
-            report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
-              count($total) . ' IDs');
-          }
-          if ($last < $time - 600 && count($total) == IDCOUNT) {
-            submit($total, SYSTEMID);
-            $last = $time;
-            foreach ($total as $k => $t) {
-              $total[$k]['Power'] = 0;
-              $total[$k]['Count'] = 0;
-            }
+      } else {
+        // in AGGREGATE mode, only report if we have seen all inverters
+        if (count($total) != IDCOUNT) {
+          report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
+            count($total) . ' IDs');
+        } elseif ($last < $time - 600) {
+          submit($total, SYSTEMID);
+          $last = $time;
+          foreach ($total as $key => $t) {
+            $total[$key]['Power'] = 0;
+            $total[$key]['Count'] = 0;
           }
         }
-        if (defined('MYSQLDB'))
-          submit_mysql($v, $LifeWh);
+      }
+      $total[$id]['TS'] = $time;
     }
   }
 }
 
+/*
+ * Setup a listening socket
+ */
 function setup() {
   $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
   if ($socket === false)
@@ -242,6 +300,9 @@ function setup() {
   return $socket;
 }
 
+/*
+ * Loop accepting connections from the gatwway
+ */
 function loop($socket) {
   $errcount = 0;
   while (true) {

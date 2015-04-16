@@ -44,11 +44,12 @@ CREATE TABLE enecsys (
   id INT NOT NULL,
   wh INT NOT NULL,
   dcpower INT NOT NULL,
-  dccurrent float NOT NULL,
-  efficiency float NOT NULL,
+  dccurrent FLOAT NOT NULL,
+  efficiency FLOAT NOT NULL,
   acfreq INT NOT NULL,
-  acvolt INT NOT NULL,
-  temp INT NOT NULL,
+  acvolt FLOAT NOT NULL,
+  temp FLOAT NOT NULL,
+  state INT NOT NULL,
   KEY (ts, id)
 );
 ````
