@@ -31,14 +31,14 @@ define('EXTENDED', 0);
 `LIFETIME` should be set to `0` if your lifetime kWh values produce wrong
 values. That seems to happen in some installations when panels are producing 
 close to their maximum capacity.
-By default, the script aggragtes data from the inverters and sends 
+By default, the script aggregates data from the inverters and sends 
 a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput.
 
 # Extra state information
 Enecsys inverters report state information to the gateway. This state
-information can be reported to PVOutput.
-This is a donation only feature. Currently three values are sent:
+information can be reported to PVOutput using a donation only feature.
+Currently three values are sent:
 v7 is the count of inverters producing more than zero power, v8 is the count of
 inverters with state 0, 1 or 3 and v9 is the count of inverters with a
 state unequal to 0, 1 or 3. It is possible to create alerts based on these. 
