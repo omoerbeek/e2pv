@@ -20,10 +20,14 @@ require_once 'config.php';
 // define('IDCOUNT', 4);
 // define('APIKEY', 'PVOutput hex api key');
 // define('SYSTEMID', 'PVOutput system id');
+// define('MODE', 'AGGREGATE');
 
-// In case LIFETIMNE is not define inb config.sys, default to LIFETIME mode
+// In case LIFETIME is not defined in config.php, default to LIFETIME mode
 if (!defined('LIFETIME'))
   define('LIFETIME', 1);
+// In case EXTENDED is not defined in config.php, do not send state counts
+if (!defined('EXTENDED'))
+  define('EXTENDED', 0);
 
 /*
  * Report a message
@@ -40,11 +44,13 @@ function fatal($msg) {
   exit(1);
 }
 
-// array holding last received values per inverter, index by inverter id
+// $otal is an array holding last received values per inverter, indexed by
+// inverter id. Each value is an array of name => value mappings, where name is:
+// TS, Energy, Power, Temp, Volt, State, Count
 $total = array();
 // When did we last send to PVOUtput?
 $last = 0;
-// When did we last send a reply back?
+// When did we last send a reply back to the gateway?
 $lastkeepalive = 0;
 
 /*
@@ -58,11 +64,29 @@ function submit($total, $systemid) {
   $p = 0.0;
   $temp = 0.0;
   $volt = 0.0;
+  $nonzerocount = 0;
+  $okstatecount = 0;
+  $otherstatecount = 0;
+
   foreach ($total as $t) {
     $e += $t['Energy'];
     $p += (double)$t['Power'] / $t['Count'];
     $temp += $t['Temperature'];
     $volt += $t['Volt'];
+
+    if ($t['Power'] > 0)
+      $nonzerocount++;
+
+    switch ($t['State']) {
+    case 0:  // normal, supplying to grid
+    case 1:  // not enough light
+    case 3:  // other low light condition
+      $okstatecount++;
+      break;
+    default:
+      $otherstatecount++;
+      break;
+   }
   }
   $temp /= count($total);
   $volt /= count($total);
@@ -86,6 +110,13 @@ function submit($total, $systemid) {
     $data['v1'] = $e;
     $data['c1'] = 1;
   }
+  if (EXTENDED) {
+    report(sprintf('   v7=%d v8=%d v9=%d', $nonzerocount, $okstatecount,
+      $otherstatecount));
+    $data['v7'] = $nonzerocount;
+    $data['v8'] = $okstatecount;
+    $data['v9'] = $otherstatecount;
+  }
 
   // We have all the data, prepare POST to PVOutput
   $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
@@ -101,10 +132,11 @@ function submit($total, $systemid) {
   $context = stream_context_create($ctx);
   $fp = fopen($url, 'r', false, $context);
   if (!$fp)
-    report('POST failed, check your APIKEY and SYSTEMID');
+    report('POST failed, check your APIKEY=' . APIKEY . ' and SYSTEMID=' .
+      $systemid);
   else {
     $reply = fread($fp, 100);
-    report('PVOutput replies: ' . $reply);
+    report('<= PVOutput ' . $reply);
     fclose($fp);
   }
 
@@ -226,6 +258,7 @@ function process($socket) {
       $ACpower = $v['DCPower'] * $v['Efficiency'];
       $DCVolt = $v['DCPower'] / $v['DCCurrent'];
 
+      $time = time();
       // Clear stale entries (older than 1 hour)
       foreach ($total as $key => $t) {
         if ($total[$key]['TS'] < $time - 3600)
@@ -233,7 +266,6 @@ function process($socket) {
       }
 
       $id = $v['IDDec'];
-      $time = time();
       // Record in $total indexed by id: cummulative energy
       $total[$id]['Energy'] = $LifeWh;
       // Record in $total, indexed by id: count, cummulative power,
@@ -246,6 +278,7 @@ function process($socket) {
       $total[$id]['Power'] += $v['DCPower'];
       $total[$id]['Volt'] = $v['ACVolt'];
       $total[$id]['Temperature'] = $v['Temperature'];
+      $total[$id]['State'] = $v['State'];
 
       printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
         'S=%d L=%.3fkWh' .  PHP_EOL,
@@ -290,10 +323,12 @@ function setup() {
   $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
   if ($socket === false)
     fatal('socket_create');
+  // SO_REUSEADDR to make fast restarting of script possible
   socket_set_option($socket, SOL_SOCKET, SO_REUSEADDR, 1);
   $ok = socket_bind($socket, '0.0.0.0', 5040);
   if (!$ok) 
     fatal('socket_bind');
+  // backlog of 1, we do not serve multiple clients
   $ok = socket_listen($socket, 1);
   if (!$ok)
     fatal('socket_listen');
@@ -315,8 +350,13 @@ function loop($socket) {
         continue;
     }
     $errcount = 0;
+    // receive timeout: if we do not get something wrno the gateway for
+    // more than 90s, assume the connection is dead. Gatways are very
+    // talkative, even when it's dark
     socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO,
       array('sec' => 90, 'usec' => 0));
+    // Enable TCP keepalive mechanism, whcih detects another type of dead
+    // connections
     socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
     socket_getpeername($client, $peer);
     report('Accepted connection from ' . $peer);
@@ -326,6 +366,15 @@ function loop($socket) {
   }
 }
 
+if (isset($_SERVER['REQUEST_METHOD'])) {
+  report('only command line');
+  exit(1);
+}
+
+if (MODE != 'SPLIT' && MODE != 'AGGREGATE') {
+  report('MODE should be \'SPLIT\' or \'AGGREGATE\'');
+  exit(1);
+}
 if (MODE == 'SPLIT' && count($systemid) != IDCOUNT) {
   report('In SPLIT mode, define IDCOUNT systemid mappings');
   exit(1);
@@ -335,4 +384,4 @@ $socket = setup();
 loop($socket);
 socket_close($socket);
 
-?>        
+?>

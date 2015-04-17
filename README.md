@@ -23,6 +23,7 @@ define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
 define('SYSTEMID', 'NNNNNN');
 define('LIFETIME', 1);
 define('MODE', 'AGGREGATE');
+define('EXTENDED', 0);
 ?>
 ```
 `IDCOUNT` needs to be set to the number of inverters you have. `APIKEY` and
@@ -32,6 +33,17 @@ values. That seems to happen in some installations when panels are producing
 close to their maximum capacity.
 By default, the script aggragtes data from the inverters and sends 
 a single record to PVOutput every 10 minutes.
+If `EXTENDED` is set to `1`, extra state information is sent to PVOutput.
+
+# Extra state information
+Enecsys inverters report state information to the gateway. This state
+information can be reported to PVOutput.
+This is a donation only feature. Currently three values are sent:
+v7 is the count of inverters producing more than zero power, v8 is the count of
+inverters with state 0, 1 or 3 and v9 is the count of inverters with a
+state unequal to 0, 1 or 3. It is possible to create alerts based on these. 
+A typcal alert would trigger on a v9 being 1 or higher. See
+http://www.drijf.net/enecsys/extendeddata.jpg for an example configuration.
 
 # Optional MySQL support
 php needs to be installed with the mysqli extension enabled.
