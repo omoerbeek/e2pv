@@ -78,10 +78,8 @@ define('MYSQLPORT', '3306');
 
 # Aggregation vs Splitting
 By default, the script will collect values from the configured number of
-inverters and submit aggregated data to PVOutput. It is possible to
-send the data from the individual inverters to PVOutput. Using the "Parent"
-feature of PVOutput, a system can be defined that displays the aggregated
-data of all inverters. Note that this feature is a *donation only* feature.
+inverters and submit aggregated data to PVOutput. It is possible to also
+send the data from the individual inverters to PVOutput. 
 
 An example config.php snippet for a split configuration:
 
@@ -102,3 +100,4 @@ $systemid = array(
 ?>
 ```
 Data for inverter `120069930` will be sent to PVOutput SystemID `123456`, etc.
+Aggragted data will also by sent to the main `SYSTEMID`.

@@ -15,12 +15,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+// By default, $ignored array is empty
+$ignored = array();
+
+// See README.md for details on config.php
 require_once 'config.php';
-// Example to put in config.php:
-// define('IDCOUNT', 4);
-// define('APIKEY', 'PVOutput hex api key');
-// define('SYSTEMID', 'PVOutput system id');
-// define('MODE', 'AGGREGATE');
 
 // In case LIFETIME is not defined in config.php, default to LIFETIME mode
 if (!defined('LIFETIME'))
@@ -46,7 +45,7 @@ function fatal($msg) {
 
 // $otal is an array holding last received values per inverter, indexed by
 // inverter id. Each value is an array of name => value mappings, where name is:
-// TS, Energy, Power, Temp, Volt, State, Count
+// TS, Energy, Power array, Temp, Volt, State
 $total = array();
 // When did we last send to PVOUtput?
 $last = 0;
@@ -57,7 +56,7 @@ $lastkeepalive = 0;
  * Compute aggregate info to send to PVOutput
  * See http://pvoutput.org/help.html#api-addstatus
  */
-function submit($total, $systemid) {
+function submit($total, $systemid, $apikey) {
   // Compute aggragated data: energy, power, avg temp avg volt
   // Power is avg power over the reporting interval
   $e = 0.0;
@@ -70,11 +69,14 @@ function submit($total, $systemid) {
 
   foreach ($total as $t) {
     $e += $t['Energy'];
-    $p += (double)$t['Power'] / $t['Count'];
+    $pp = 0;
+    foreach ($t['Power'] as $x)
+      $pp += $x;
+    $p += (double)$pp / count($t['Power']);
     $temp += $t['Temperature'];
     $volt += $t['Volt'];
 
-    if ($t['Power'] > 0)
+    if ($p > 0)
       $nonzerocount++;
 
     switch ($t['State']) {
@@ -93,10 +95,11 @@ function submit($total, $systemid) {
   $p = round($p);
 
   if (LIFETIME)
-    report(sprintf('=> PVOutput v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
-      $e, $p, $temp, $volt));
+    report(sprintf('=> PVOutput (%s) v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
+      count($total) == 1 ? $systemid : 'A', $e, $p, $temp, $volt));
   else
-    report(sprintf('=> PVOutput v2=%dW v5=%.1fC v6=%.1fV', $p, $temp, $volt));
+    report(sprintf('=> PVOutput (%s) v2=%dW v5=%.1fC v6=%.1fV',
+      count($total) == 1 ? $systemid : 'A', $p, $temp, $volt));
   $time = time();
   $data = array('d' => strftime('%Y%m%d', $time),
     't' => strftime('%H:%M', $time),
@@ -120,7 +123,7 @@ function submit($total, $systemid) {
 
   // We have all the data, prepare POST to PVOutput
   $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
-    'X-Pvoutput-Apikey: ' . APIKEY . "\r\n" .
+    'X-Pvoutput-Apikey: ' . $apikey . "\r\n" .
     'X-Pvoutput-SystemId: ' . $systemid . "\r\n";
   $url = 'http://pvoutput.org/service/r2/addstatus.jsp';
   
@@ -132,7 +135,7 @@ function submit($total, $systemid) {
   $context = stream_context_create($ctx);
   $fp = fopen($url, 'r', false, $context);
   if (!$fp)
-    report('POST failed, check your APIKEY=' . APIKEY . ' and SYSTEMID=' .
+    report('POST failed, check your APIKEY=' . $apikey . ' and SYSTEMID=' .
       $systemid);
   else {
     $reply = fread($fp, 100);
@@ -220,7 +223,7 @@ function submit_mysql($v, $LifeWh) {
  * Loop processing lines from the gatway
  */
 function process($socket) {
-  global $total, $last, $lastkeepalive, $systemid;
+  global $total, $last, $lastkeepalive, $systemid, $apikey, $ignored;
 
   while (true) {
     $str = reader($socket);
@@ -229,10 +232,11 @@ function process($socket) {
     }
     // Send a reply if the last reply is 200 seconds ago
     if ($lastkeepalive < time() - 200) {
+      //echo 'write' . PHP_EOL;
       if (socket_write($socket, "0E0000000000cgAD83\r") === false)
         return;
+      //echo 'write done' . PHP_EOL;
       $lastkeepalive = time();
-      //report('send keepalive');
     }
     $str = str_replace(array("\n", "\r"), "", $str);
     //report($str);
@@ -246,12 +250,21 @@ function process($socket) {
       //report(strlen($sub) . ' ' . $sub);
       $bin = base64_decode($sub);
       // Incomplete? skip
-      if (strlen($bin) != 42)
+      if (strlen($bin) != 42) {
+        report('Unexpected length ' . strlen($bin) . ' skip...');
         continue;
-
+      }
       //echo bin2hex($bin) . PHP_EOL;
       $v = unpack('VIDDec/c18dummy/CState/nDCCurrent/nDCPower/' .
          'nEfficiency/cACFreq/nACVolt/cTemperature/nWh/nkWh', $bin);
+      $id = $v['IDDec'];
+
+      if (in_array($id, $ignored))
+        continue;
+      if (MODE == 'SPLIT' && !isset($systemid[$id])) {
+        report('SPLIT MODE and inverter ' . $id . ' not in $systemid array');
+        continue;
+      }
       $v['DCCurrent'] *= 0.025;
       $v['Efficiency'] *= 0.001;
       $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
@@ -265,17 +278,17 @@ function process($socket) {
           unset($total[$key]);
       }
 
-      $id = $v['IDDec'];
       // Record in $total indexed by id: cummulative energy
       $total[$id]['Energy'] = $LifeWh;
       // Record in $total, indexed by id: count, cummulative power,
       // volt and temp
       if (!isset($total[$id]['Power'])) {
-        $total[$id]['Power'] = 0;
-        $total[$id]['Count'] = 0;
+        $total[$id]['Power'] = array();
       }
-      $total[$id]['Count']++;
-      $total[$id]['Power'] += $v['DCPower'];
+      // pop oldest value
+      if (count($total[$id]['Power']) > 10)
+        array_shift($total[$id]['Power']);
+      $total[$id]['Power'][] = $v['DCPower'];
       $total[$id]['Volt'] = $v['ACVolt'];
       $total[$id]['Temperature'] = $v['Temperature'];
       $total[$id]['State'] = $v['State'];
@@ -293,25 +306,21 @@ function process($socket) {
       if (MODE == 'SPLIT') {
         // time to report for this inverter?
         if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
-          submit(array($total[$id]), $systemid[$id]);
-          $total[$id]['Power'] = 0;
-          $total[$id]['Count'] = 0;
+          $apikey = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
+          submit(array($total[$id]), $systemid[$id], $apikey);
+          $total[$id]['TS'] = $time;
         }
-      } else {
-        // in AGGREGATE mode, only report if we have seen all inverters
-        if (count($total) != IDCOUNT) {
-          report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
-            count($total) . ' IDs');
-        } elseif ($last < $time - 600) {
-          submit($total, SYSTEMID);
-          $last = $time;
-          foreach ($total as $key => $t) {
-            $total[$key]['Power'] = 0;
-            $total[$key]['Count'] = 0;
-          }
-        }
+      } 
+      // for AGGREGATE, only report if we have seen all inverters
+      if (count($total) != IDCOUNT) {
+        report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
+          count($total) . ' IDs');
+      } elseif ($last < $time - 600) {
+        submit($total, SYSTEMID, APIKEY);
+        $last = $time;
       }
-      $total[$id]['TS'] = $time;
+      if (MODE == 'AGGREGATE')
+        $total[$id]['TS'] = $time;
     }
   }
 }
@@ -350,12 +359,12 @@ function loop($socket) {
         continue;
     }
     $errcount = 0;
-    // receive timeout: if we do not get something wrno the gateway for
-    // more than 90s, assume the connection is dead. Gatways are very
+    // receive timeout: if we do not get something from the gateway for
+    // more than 90s, assume the connection is dead. Gateways are very
     // talkative, even when it's dark
     socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO,
       array('sec' => 90, 'usec' => 0));
-    // Enable TCP keepalive mechanism, whcih detects another type of dead
+    // Enable TCP keepalive mechanism, which detects another type of dead
     // connections
     socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
     socket_getpeername($client, $peer);
