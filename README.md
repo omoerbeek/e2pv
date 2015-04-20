@@ -122,3 +122,9 @@ Aggragted data will also by sent to the main `SYSTEMID`.
 If an Enecsys ID is found in the `$apikey` array, output will be
 sent to the corresponding apikey, otherwise it will be sent to the
 default apikey `APIKEY`.
+
+Older versions of `e2pv.php` required the use of the parent feature
+of PVOutput. This is no longer required. Actually, having a parent
+structure setup on a system that also gets aggregated info from
+this script likely will cause incorrect data to be collected at
+PVOutput.
