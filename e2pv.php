@@ -170,7 +170,7 @@ function reader($socket) {
   while (true) {
     $pos = strpos($buf, "\r");
     if ($pos === false) {
-      $ret = socket_recv($socket, $str, 128, 0);
+      $ret = @socket_recv($socket, $str, 128, 0);
       if ($ret === false || $ret == 0) {
         if ($last_read <= time() - 90)
           return false;
