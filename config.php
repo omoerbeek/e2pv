@@ -24,7 +24,7 @@ define('EXTENDED', 0);       // Send state data? Uses donation only feature
 
 // The following inverter ids are ignored (e.g. the neighbours' ones)
 $ignored = array(
-// NNNNNN,
+// NNNNNNNNN,
 // ...
 );
 

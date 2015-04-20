@@ -24,6 +24,11 @@ define('SYSTEMID', 'NNNNNN');
 define('LIFETIME', 1);
 define('MODE', 'AGGREGATE');
 define('EXTENDED', 0);
+// The following inverter ids are ignored (e.g. the neighbours' ones)
+$ignored = array(
+// NNNNNNNNN,
+// ...
+);
 ?>
 ```
 `IDCOUNT` needs to be set to the number of inverters you have. `APIKEY` and
@@ -33,17 +38,22 @@ values. That seems to happen in some installations when panels are producing
 close to their maximum capacity.
 By default, the script aggregates data from the inverters and sends 
 a single record to PVOutput every 10 minutes.
-If `EXTENDED` is set to `1`, extra state information is sent to PVOutput.
+If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
+below for details.
+If an Enecsys ID is found in the `$ignored` array, no data for this
+inverter will be processedn. This can be handy to ignore the
+neigbours' inverters which are received by your gateway.
 
-# Extra state information
-Enecsys inverters report state information to the gateway. This state
-information can be reported to PVOutput using a donation only feature.
-Currently three values are sent:
-v7 is the count of inverters producing more than zero power, v8 is the count of
-inverters with state 0, 1 or 3 and v9 is the count of inverters with a
-state unequal to 0, 1 or 3. It is possible to create alerts based on these. 
-A typcal alert would trigger on a v9 being 1 or higher. See
-http://www.drijf.net/enecsys/extendeddata.jpg for an example configuration.
+# Extended state information
+Enecsys inverters report state information to the gateway. This
+state information can be reported to PVOutput using a donation only
+feature.  Currently three values are sent: `v7` is the count of
+inverters producing more than zero power, `v8` is the count of
+inverters with state 0, 1 or 3 and `v9` is the count of inverters
+with a state unequal to 0, 1 or 3. It is possible to create alerts
+based on these.  A typcal alert would trigger on a `v9` being 1 or
+higher. See http://www.drijf.net/enecsys/extendeddata.jpg for an
+example configuration.
 
 # Optional MySQL support
 php needs to be installed with the mysqli extension enabled.
@@ -97,7 +107,18 @@ $systemid = array(
   120069930 => 123456,
   // three more
 );
+
+// If mode is SPLIT, optionally define the Enecsys ID to APIKEY mappings
+// If an id is not found, the default APIKEY from above is used.
+//$apikey = array(
+// NNNNNNNNN => 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh',
+// NNNNNNNNN => 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh',
+//);
+
 ?>
 ```
 Data for inverter `120069930` will be sent to PVOutput SystemID `123456`, etc.
 Aggragted data will also by sent to the main `SYSTEMID`.
+If an Enecsys ID is found in the `$apikey` array, output will be
+sent to the corresponding apikey, otherwise it will be sent to the
+default apikey `APIKEY`.
