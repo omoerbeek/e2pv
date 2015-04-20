@@ -166,12 +166,18 @@ function submit($total, $systemid, $apikey) {
 $buf = '';
 function reader($socket) {
   global $buf;
+  $last_read = time();
   while (true) {
     $pos = strpos($buf, "\r");
     if ($pos === false) {
-      $str = socket_read($socket, 128, PHP_NORMAL_READ);
-      if ($str === false || strlen($str) == 0)
-        return false;
+      $ret = socket_recv($socket, $str, 128, 0);
+      if ($ret === false || $ret == 0) {
+        if ($last_read <= time() - 90)
+          return false;
+        sleep(3);
+        continue;
+      }
+      $last_read = time();
       $buf .= $str;
       continue;
     } else {
@@ -251,7 +257,7 @@ function process($socket) {
       $bin = base64_decode($sub);
       // Incomplete? skip
       if (strlen($bin) != 42) {
-        report('Unexpected length ' . strlen($bin) . ' skip...');
+        //report('Unexpected length ' . strlen($bin) . ' skip...');
         continue;
       }
       //echo bin2hex($bin) . PHP_EOL;
@@ -280,7 +286,7 @@ function process($socket) {
 
       // Record in $total indexed by id: cummulative energy
       $total[$id]['Energy'] = $LifeWh;
-      // Record in $total, indexed by id: count, cummulative power,
+      // Record in $total, indexed by id: count, last 10 power values
       // volt and temp
       if (!isset($total[$id]['Power'])) {
         $total[$id]['Power'] = array();
@@ -359,14 +365,8 @@ function loop($socket) {
         continue;
     }
     $errcount = 0;
-    // receive timeout: if we do not get something from the gateway for
-    // more than 90s, assume the connection is dead. Gateways are very
-    // talkative, even when it's dark
-    socket_set_option($client, SOL_SOCKET, SO_RCVTIMEO,
-      array('sec' => 90, 'usec' => 0));
-    // Enable TCP keepalive mechanism, which detects another type of dead
-    // connections
-    socket_set_option($client, SOL_SOCKET, SO_KEEPALIVE, 1);
+    if (!socket_set_nonblock($client))
+      fatal('socket_set_nonblock');
     socket_getpeername($client, $peer);
     report('Accepted connection from ' . $peer);
     process($client);
