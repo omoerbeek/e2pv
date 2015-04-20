@@ -41,7 +41,7 @@ a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
 If an Enecsys ID is found in the `$ignored` array, no data for this
-inverter will be processedn. This can be handy to ignore the
+inverter will be processed. This can be handy to ignore the
 neigbours' inverters which are received by your gateway.
 
 # Extended state information
@@ -51,7 +51,7 @@ feature.  Currently three values are sent: `v7` is the count of
 inverters producing more than zero power, `v8` is the count of
 inverters with state 0, 1 or 3 and `v9` is the count of inverters
 with a state unequal to 0, 1 or 3. It is possible to create alerts
-based on these.  A typcal alert would trigger on a `v9` being 1 or
+based on these.  A typical alert would trigger on a `v9` being 1 or
 higher. See http://www.drijf.net/enecsys/extendeddata.jpg for an
 example configuration.
 
