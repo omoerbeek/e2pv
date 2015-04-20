@@ -312,8 +312,8 @@ function process($socket) {
       if (MODE == 'SPLIT') {
         // time to report for this inverter?
         if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
-          $apikey = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
-          submit(array($total[$id]), $systemid[$id], $apikey);
+          $key = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
+          submit(array($total[$id]), $systemid[$id], $key);
           $total[$id]['TS'] = $time;
         }
       } 
