@@ -27,6 +27,9 @@ if (!defined('LIFETIME'))
 // In case EXTENDED is not defined in config.php, do not send state counts
 if (!defined('EXTENDED'))
   define('EXTENDED', 0);
+// In case AC is not defined in config.php, default to 0
+if (!defined('AC'))
+  define('AC', 0);
 
 /*
  * Report a message
@@ -74,10 +77,11 @@ function submit($total, $systemid, $apikey) {
       $pp += $x;
     $p += (double)$pp / count($t['Power']);
     $temp += $t['Temperature'];
-    $volt += $t['Volt'];
 
-    if ($p > 0)
+    if ($pp > 0) {
+      $volt += $t['Volt'];
       $nonzerocount++;
+    }
 
     switch ($t['State']) {
     case 0:  // normal, supplying to grid
@@ -91,7 +95,8 @@ function submit($total, $systemid, $apikey) {
    }
   }
   $temp /= count($total);
-  $volt /= count($total);
+  if ($nonzerocount > 0)
+    $volt /= $nonzerocount;
   $p = round($p);
 
   if (LIFETIME)
@@ -274,7 +279,7 @@ function process($socket) {
       $v['DCCurrent'] *= 0.025;
       $v['Efficiency'] *= 0.001;
       $LifeWh = $v['kWh'] * 1000 + $v['Wh'];
-      $ACpower = $v['DCPower'] * $v['Efficiency'];
+      $ACPower = $v['DCPower'] * $v['Efficiency'];
       $DCVolt = $v['DCPower'] / $v['DCCurrent'];
 
       $time = time();
@@ -294,7 +299,7 @@ function process($socket) {
       // pop oldest value
       if (count($total[$id]['Power']) > 10)
         array_shift($total[$id]['Power']);
-      $total[$id]['Power'][] = $v['DCPower'];
+      $total[$id]['Power'][] = AC ? $ACPower : $v['DCPower'];
       $total[$id]['Volt'] = $v['ACVolt'];
       $total[$id]['Temperature'] = $v['Temperature'];
       $total[$id]['State'] = $v['State'];
@@ -302,7 +307,7 @@ function process($socket) {
       printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
         'S=%d L=%.3fkWh' .  PHP_EOL,
         $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
-        $v['ACVolt'], $ACpower,
+        $v['ACVolt'], $ACPower,
         $v['Efficiency'], $v['Temperature'], $v['State'],
         $LifeWh / 1000);
 
@@ -311,7 +316,7 @@ function process($socket) {
 
       if (MODE == 'SPLIT') {
         // time to report for this inverter?
-        if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 600) {
+        if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 540) {
           $key = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
           submit(array($total[$id]), $systemid[$id], $key);
           $total[$id]['TS'] = $time;
@@ -321,7 +326,7 @@ function process($socket) {
       if (count($total) != IDCOUNT) {
         report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
           count($total) . ' IDs');
-      } elseif ($last < $time - 600) {
+      } elseif ($last < $time - 540) {
         submit($total, SYSTEMID, APIKEY);
         $last = $time;
       }
@@ -380,8 +385,19 @@ if (isset($_SERVER['REQUEST_METHOD'])) {
   exit(1);
 }
 
-if (MODE != 'SPLIT' && MODE != 'AGGREGATE') {
+if (!defined('LIFETIME') || (LIFETIME !== 0 && LIFETIME !== 1)) {
+  report('LIFETIME should be defined to 0 or 1');
+  exit(1);
+}
+if (!defined('EXTENDED') || (EXTENDED !== 0 && EXTENDED !== 1)) {
+  report('EXTENDED should be defined to 0 or 1');
+}
+if (!defined('MODE') || (MODE != 'SPLIT' && MODE != 'AGGREGATE')) {
   report('MODE should be \'SPLIT\' or \'AGGREGATE\'');
+  exit(1);
+}
+if (!defined('AC') || (AC !== 0 && AC !== 1)) {
+  report('AC should be defined to 0 or 1');
   exit(1);
 }
 if (MODE == 'SPLIT' && count($systemid) != IDCOUNT) {

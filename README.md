@@ -24,6 +24,7 @@ define('SYSTEMID', 'NNNNNN');
 define('LIFETIME', 1);
 define('MODE', 'AGGREGATE');
 define('EXTENDED', 0);
+define('AC', 0);
 // The following inverter ids are ignored (e.g. the neighbours' ones)
 $ignored = array(
 // NNNNNNNNN,
@@ -40,6 +41,9 @@ By default, the script aggregates data from the inverters and sends
 a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
+By default, the script sends raw DC power data to PVOutput. In a lot of cases
+this data reflects the actually power generated. In some cases, the reported
+dat is e few percent too high. In those cases, define `AC` to 1.
 If an Enecsys ID is found in the `$ignored` array, no data for this
 inverter will be processed. This can be handy to ignore the
 neigbours' inverters which are received by your gateway.

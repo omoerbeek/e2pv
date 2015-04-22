@@ -6,6 +6,8 @@ define('SYSTEMID', 'NNNNNN');
 define('LIFETIME', 1);       // see README.md
 define('MODE', 'AGGREGATE'); // 'AGGREGATE' or 'SPLIT'
 define('EXTENDED', 0);       // Send state data? Uses donation only feature
+// AC is default 0. See README.md
+define('AC', 0);             // Send DC data or AC (DC * Efficiency)
 
 // If mode is SPLIT, define the Enecsys ID to PVOutput SystemID mapping for each
 // inverter.
