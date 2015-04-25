@@ -333,6 +333,8 @@ function process($socket) {
       if (MODE == 'AGGREGATE')
         $total[$id]['TS'] = $time;
     }
+    
+    return;
   }
 }
 
