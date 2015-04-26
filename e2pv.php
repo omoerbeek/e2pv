@@ -329,17 +329,22 @@ function setup() {
  * Loop accepting connections from the gateway
  */
 function loop($socket) {
+  // array used for socket_select, index by string repr of resource
   $selarray = array('accept' => $socket);
+  // array of Connection instances, index by same
   $connections = array();
+
   while (true) {
     $a = $selarray;
     $no = null;
-    $err = socket_select($a, $no, $no, 3, 0);
+    $err = socket_select($a, $no, $no, 30, 0);
     if ($err === false) {
       fatal('socket_select');
     }
     while (count($a) > 0) {
+      // process sockets with work pending
       $s = array_shift($a);
+      // Accepting socket?
       if ($s == $socket) {
         $client = socket_accept($socket);
         if ($client === false) {
@@ -351,6 +356,7 @@ function loop($socket) {
         report('Accepted connection #' . count($connections) .  ' from ' .
           $conn->toString());
       } else {
+        // Regular connection socket
         $conn = $connections[(string)$s];
         if (!$conn->reader()) {
           $conn->close();
@@ -365,7 +371,7 @@ function loop($socket) {
     $time = time();
     foreach ($connections as $key =>$conn) {
       if (!$conn->alive($time)) {
-        report('Connection dead');
+        report('Connection dead...');
         $conn->close();
         unset($selarray[$key]);
         unset($connections[$key]);
