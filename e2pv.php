@@ -205,7 +205,7 @@ function submit_mysql($v, $LifeWh) {
  * Loop processing lines from the gatway
  */
 function process(Connection $conn) {
-  global $total, $last, $lastkeepalive, $systemid, $apikey, $ignored;
+  global $total, $last, $systemid, $apikey, $ignored;
 
   while (true) {
     $str = $conn->getline();
@@ -333,6 +333,7 @@ function loop($socket) {
   $selarray = array('accept' => $socket);
   // array of Connection instances, index by same
   $connections = array();
+  $lastclean = time();
 
   while (true) {
     $a = $selarray;
@@ -369,12 +370,15 @@ function loop($socket) {
     }
     // Cleanup stale connections
     $time = time();
-    foreach ($connections as $key =>$conn) {
-      if (!$conn->alive($time)) {
-        report('Connection dead...');
-        $conn->close();
-        unset($selarray[$key]);
-        unset($connections[$key]);
+    if ($lastclean < $time - 30) {
+      $lastclean = time();
+      foreach ($connections as $key =>$conn) {
+        if (!$conn->alive($time)) {
+          report('A connection went dead...');
+          $conn->close();
+          unset($selarray[$key]);
+          unset($connections[$key]);
+        }
       }
     }
   }
