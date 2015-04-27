@@ -43,8 +43,8 @@ If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
 By default, the script sends raw DC power data to PVOutput. In a lot of cases
 this data reflects the actually power generated. In some cases, the reported
-dat is e few percent too high. In those cases, define `AC` to 1.
-If an Enecsys ID is found in the `$ignored` array, no data for this
+dat is e few percent too high. In those cases, define `AC` to `1`.
+If an Inverter ID is found in the `$ignored` array, no data for this
 inverter will be processed. This can be handy to ignore the
 neigbours' inverters which are received by your gateway.
 
