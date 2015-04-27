@@ -295,7 +295,7 @@ function process(Connection $conn) {
       } 
       // for AGGREGATE, only report if we have seen all inverters
       if (count($total) != IDCOUNT) {
-        report('Expecing IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
+        report('Expecting IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
           count($total) . ' IDs');
       } elseif ($last < $time - 540) {
         submit($total, SYSTEMID, APIKEY);
