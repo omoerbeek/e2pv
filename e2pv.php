@@ -52,8 +52,6 @@ function fatal($msg) {
 $total = array();
 // When did we last send to PVOUtput?
 $last = 0;
-// When did we last send a reply back to the gateway?
-$lastkeepalive = 0;
 
 /*
  * Compute aggregate info to send to PVOutput
@@ -165,33 +163,6 @@ function submit($total, $systemid, $apikey) {
 }
 
 
-/*
- * Read data from socket until a "\r" is seen
- */
-$buf = '';
-function reader($socket) {
-  global $buf;
-  $last_read = time();
-  while (true) {
-    $pos = strpos($buf, "\r");
-    if ($pos === false) {
-      $ret = @socket_recv($socket, $str, 128, 0);
-      if ($ret === false || $ret == 0) {
-        if ($last_read <= time() - 90)
-          return false;
-        sleep(3);
-        continue;
-      }
-      $last_read = time();
-      $buf .= $str;
-      continue;
-    } else {
-      $str = substr($buf, 0, $pos + 1);
-      $buf = substr($buf, $pos + 2);
-      return $str;
-    }
-  }
-}
 
 /*
  * Submit data to MySQL
@@ -233,21 +204,21 @@ function submit_mysql($v, $LifeWh) {
 /*
  * Loop processing lines from the gatway
  */
-function process($socket) {
-  global $total, $last, $lastkeepalive, $systemid, $apikey, $ignored;
+function process(Connection $conn) {
+  global $total, $last, $systemid, $apikey, $ignored;
 
   while (true) {
-    $str = reader($socket);
+    $str = $conn->getline();
     if ($str === false) {
         return;
     }
     // Send a reply if the last reply is 200 seconds ago
-    if ($lastkeepalive < time() - 200) {
+    if ($conn->lastkeepalive < time() - 200) {
       //echo 'write' . PHP_EOL;
-      if (socket_write($socket, "0E0000000000cgAD83\r") === false)
+      if (socket_write($conn->socket, "0E0000000000cgAD83\r") === false)
         return;
       //echo 'write done' . PHP_EOL;
-      $lastkeepalive = time();
+      $conn->lastkeepalive = time();
     }
     $str = str_replace(array("\n", "\r"), "", $str);
     //report($str);
@@ -348,35 +319,68 @@ function setup() {
   $ok = socket_bind($socket, '0.0.0.0', 5040);
   if (!$ok) 
     fatal('socket_bind');
-  // backlog of 1, we do not serve multiple clients
-  $ok = socket_listen($socket, 1);
+  $ok = socket_listen($socket);
   if (!$ok)
     fatal('socket_listen');
   return $socket;
 }
 
 /*
- * Loop accepting connections from the gatwway
+ * Loop accepting connections from the gateway
  */
 function loop($socket) {
-  $errcount = 0;
+  // array used for socket_select, index by string repr of resource
+  $selarray = array('accept' => $socket);
+  // array of Connection instances, index by same
+  $connections = array();
+  $lastclean = time();
+
   while (true) {
-    $client = socket_accept($socket);
-    if (!$client) {
-      report('Socket_accept: ' . socket_strerror(socket_last_error()));
-      if (++$errcount > 100)
-        fatal('Too many socket_accept errors in a row');
-      else
-        continue;
+    $a = $selarray;
+    $no = null;
+    $err = socket_select($a, $no, $no, 30, 0);
+    if ($err === false) {
+      fatal('socket_select');
     }
-    $errcount = 0;
-    if (!socket_set_nonblock($client))
-      fatal('socket_set_nonblock');
-    socket_getpeername($client, $peer);
-    report('Accepted connection from ' . $peer);
-    process($client);
-    socket_close($client);
-    report('Connection closed'); 
+    while (count($a) > 0) {
+      // process sockets with work pending
+      $s = array_shift($a);
+      // Accepting socket?
+      if ($s == $socket) {
+        $client = socket_accept($socket);
+        if ($client === false) {
+          continue;
+        }
+        $conn = new Connection($client);
+        $selarray[(string)$client] = $client;
+        $connections[(string)$client] = $conn;
+        report('Accepted connection #' . count($connections) .  ' from ' .
+          $conn->toString());
+      } else {
+        // Regular connection socket
+        $conn = $connections[(string)$s];
+        if (!$conn->reader()) {
+          $conn->close();
+          unset($selarray[(string)$s]);
+          unset($connections[(string)$s]);
+        } else {
+          process($conn);
+        }
+      }
+    }
+    // Cleanup stale connections
+    $time = time();
+    if ($lastclean < $time - 30) {
+      $lastclean = time();
+      foreach ($connections as $key =>$conn) {
+        if (!$conn->alive($time)) {
+          report('A connection went dead...');
+          $conn->close();
+          unset($selarray[$key]);
+          unset($connections[$key]);
+        }
+      }
+    }
   }
 }
 
@@ -409,4 +413,53 @@ $socket = setup();
 loop($socket);
 socket_close($socket);
 
+/*
+ * class for connection maintenance
+ */
+class Connection {
+  public $socket;
+  public $buf = '';
+  public $lastkeepalive = 0;
+  public $last_read;
+
+  public function __construct($socket) {
+    $this->socket = $socket;
+    $this->last_read = time();
+  }
+ 
+  public function reader() { 
+    $ret = socket_recv($this->socket, $str, 128, 0);
+    if ($ret == false || $ret == 0) {
+      return false;
+    }
+    $this->last_read = time();
+    $this->buf .= $str;
+    return true;
+ }
+
+  public function getline() {
+    $pos = strpos($this->buf, "\r");
+    if ($pos === false) {
+      return false;
+    }
+    $str = substr($this->buf, 0, $pos + 1);
+    $this->buf = substr($this->buf, $pos + 2);
+    return $str;
+  }
+
+  public function close() {
+    report('Closed connection from ' . $this->toString());
+    socket_close($this->socket);
+    $this->socket = null;
+  }
+
+  public function toString() {
+    socket_getpeername($this->socket, $peer, $port);
+    return $peer . ':' . $port;
+  }
+
+  public function alive($time) {
+    return $this->last_read > $time - 90;
+  }
+}
 ?>
