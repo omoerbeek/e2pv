@@ -259,7 +259,8 @@ function process(Connection $conn) {
         if ($total[$key]['TS'] < $time - 3600)
           unset($total[$key]);
       }
-
+      
+      $oldcount = count($total);
       // Record in $total indexed by id: cummulative energy
       $total[$id]['Energy'] = $LifeWh;
       // Record in $total, indexed by id: count, last 10 power values
@@ -293,9 +294,13 @@ function process(Connection $conn) {
           $total[$id]['TS'] = $time;
         }
       } 
+
+      if ($oldcount == IDCOUNT - 1 && count($total) == IDCOUNT)
+        report('Seen all expected ' . IDCOUNT . ' inverter IDs');
+
       // for AGGREGATE, only report if we have seen all inverters
       if (count($total) != IDCOUNT) {
-        report('Expecting IDCOUNT=' . IDCOUNT . ' IDs, seen ' .
+        report('Expecting IDCOUNT=' . IDCOUNT . ' inverter IDs, seen ' .
           count($total) . ' IDs');
       } elseif ($last < $time - 540) {
         submit($total, SYSTEMID, APIKEY);
