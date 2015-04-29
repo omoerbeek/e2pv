@@ -3,8 +3,8 @@
 posts and sends data to PVOutput.
 
 First, setup an PVOutput account with API access enabled. Define a system,
-making sure that in the Live Settings section Status Interval is set to 10min
-and Timezone set to your local time zone and "Adjust Time" is set to "None".
+making sure that in the Live Settings section "Status Interval" is set to 10min,
+"Timezone" is  set to your local time zone and "Adjust Time" is set to "None".
 See Section "Aggregation vs Splitting" if you want it to send data per inverter.
 
 The script is run as a php command line script, no webserver is involved.
