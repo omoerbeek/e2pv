@@ -43,7 +43,7 @@ If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
 By default, the script sends raw DC power data to PVOutput. In a lot of cases
 this data reflects the actually power generated. In some cases, the reported
-dat is e few percent too high. In those cases, define `AC` to `1`.
+data is e few percent too high. In those cases, define `AC` to `1`.
 If an Inverter ID is found in the `$ignored` array, no data for this
 inverter will be processed. This can be handy to ignore the
 neigbours' inverters which are received by your gateway.
@@ -122,7 +122,7 @@ $systemid = array(
 ?>
 ```
 Data for inverter `120069930` will be sent to PVOutput SystemID `123456`, etc.
-Aggragted data will also by sent to the main `SYSTEMID`.
+Aggregated data will also by sent to the main `SYSTEMID`.
 If an Enecsys ID is found in the `$apikey` array, output will be
 sent to the corresponding apikey, otherwise it will be sent to the
 default apikey `APIKEY`.
