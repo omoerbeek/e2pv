@@ -30,11 +30,15 @@ if (!defined('EXTENDED'))
 // In case AC is not defined in config.php, default to 0
 if (!defined('AC'))
   define('AC', 0);
+if (!defined('VERBOSE'))
+  define('VERBOSE', 0);
 
 /*
  * Report a message
  */
-function report($msg) {
+function report($msg, $err = false) {
+  if (!$err && !VERBOSE)
+    return;
   echo date('Ymd-H:i:s') . ' ' . $msg . PHP_EOL;
 }
 
@@ -42,7 +46,7 @@ function report($msg) {
  * Fatal error, likely a configuration issue
  */
 function fatal($msg) {
-  report($msg . ': ' . socket_strerror(socket_last_error()));
+  report($msg . ': ' . socket_strerror(socket_last_error()), true);
   exit(1);
 }
 
@@ -139,7 +143,7 @@ function submit($total, $systemid, $apikey) {
   $fp = fopen($url, 'r', false, $context);
   if (!$fp)
     report('POST failed, check your APIKEY=' . $apikey . ' and SYSTEMID=' .
-      $systemid);
+      $systemid, true);
   else {
     $reply = fread($fp, 100);
     report('<= PVOutput ' . $reply);
@@ -171,12 +175,17 @@ $link = false;
 function submit_mysql($v, $LifeWh) {
   global $link;
 
+  // mysqli.reconnect is false by default
+  if (is_resource($link) && !mysqli_ping($link)) {
+    mysqli_close($link);
+    $link = false;
+  }
   if (!$link) {
     $link = mysqli_connect(MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDB,
       MYSQLPORT);
   }
   if (!$link) {
-    report('Cannot connect to MySQL ' . mysqli_connect_error());
+    report('Cannot connect to MySQL ' . mysqli_connect_error(), true);
     return;
   }
 
@@ -195,7 +204,7 @@ function submit_mysql($v, $LifeWh) {
     mysqli_real_escape_string($link, $v['State']));
 
   if (!mysqli_query($link, $q)) {
-   report('MySQL insert failed: ' . mysqli_error($link));
+   report('MySQL insert failed: ' . mysqli_error($link), true);
    mysqli_close($link);
    $link = false;
   }
@@ -276,12 +285,13 @@ function process(Connection $conn) {
       $total[$id]['Temperature'] = $v['Temperature'];
       $total[$id]['State'] = $v['State'];
 
-      printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
-        'S=%d L=%.3fkWh' .  PHP_EOL,
-        $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
-        $v['ACVolt'], $ACPower,
-        $v['Efficiency'], $v['Temperature'], $v['State'],
-        $LifeWh / 1000);
+      if (VERBOSE)
+        printf('%s DC=%3dW %5.2fV %4.2fA AC=%3dV %6.2fW E=%4.2f T=%2d ' .
+          'S=%d L=%.3fkWh' .  PHP_EOL,
+          $id, $v['DCPower'], $DCVolt, $v['DCCurrent'],
+          $v['ACVolt'], $ACPower,
+          $v['Efficiency'], $v['Temperature'], $v['State'],
+          $LifeWh / 1000);
 
       if (defined('MYSQLDB'))
         submit_mysql($v, $LifeWh);
@@ -390,27 +400,27 @@ function loop($socket) {
 }
 
 if (isset($_SERVER['REQUEST_METHOD'])) {
-  report('only command line');
+  report('only command line', true);
   exit(1);
 }
 
 if (!defined('LIFETIME') || (LIFETIME !== 0 && LIFETIME !== 1)) {
-  report('LIFETIME should be defined to 0 or 1');
+  report('LIFETIME should be defined to 0 or 1', true);
   exit(1);
 }
 if (!defined('EXTENDED') || (EXTENDED !== 0 && EXTENDED !== 1)) {
-  report('EXTENDED should be defined to 0 or 1');
+  report('EXTENDED should be defined to 0 or 1', true);
 }
 if (!defined('MODE') || (MODE != 'SPLIT' && MODE != 'AGGREGATE')) {
-  report('MODE should be \'SPLIT\' or \'AGGREGATE\'');
+  report('MODE should be \'SPLIT\' or \'AGGREGATE\'', true);
   exit(1);
 }
 if (!defined('AC') || (AC !== 0 && AC !== 1)) {
-  report('AC should be defined to 0 or 1');
+  report('AC should be defined to 0 or 1', true);
   exit(1);
 }
 if (MODE == 'SPLIT' && count($systemid) != IDCOUNT) {
-  report('In SPLIT mode, define IDCOUNT systemid mappings');
+  report('In SPLIT mode, define IDCOUNT systemid mappings', true);
   exit(1);
 }
   

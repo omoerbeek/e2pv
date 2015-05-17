@@ -18,6 +18,7 @@ allow_url_fopen = On
 Edit the configuration file `config.php`. 
 ```php
 <?php
+define('VERBOSE', 0);
 define('IDCOUNT', N);
 define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
 define('SYSTEMID', 'NNNNNN');
@@ -32,6 +33,7 @@ $ignored = array(
 );
 ?>
 ```
+Set `VERBOSE` to 1 if your want the script to print details on what it is doing.
 `IDCOUNT` needs to be set to the number of inverters you have. `APIKEY` and
 `SYSTEMID` correspond to your PVOutput api key and System ID.
 `LIFETIME` should be set to `0` if your lifetime kWh values produce wrong
