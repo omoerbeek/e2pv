@@ -1,5 +1,5 @@
 <?php
-define('VERBOSE', 0);        // be silent, except for errors
+define('VERBOSE', 0);        // 0: be silent, except for errors; 1: be verbose
 define('IDCOUNT', N);
 define('APIKEY', 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
 define('SYSTEMID', 'NNNNNN');
