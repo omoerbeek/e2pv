@@ -17,6 +17,7 @@
 
 // By default, $ignored array is empty
 $ignored = array();
+$groups = null;
 
 // See README.md for details on config.php
 require_once 'config.php';
@@ -32,6 +33,12 @@ if (!defined('AC'))
   define('AC', 0);
 if (!defined('VERBOSE'))
   define('VERBOSE', 0);
+
+// setup default single group mapping 
+if (is_null($groups)) {
+  $groups = new Groups();
+  $groups->addGroup(new Group(SYSTEMID, APIKEY));
+}
 
 /*
  * Report a message
@@ -50,7 +57,7 @@ function fatal($msg) {
   exit(1);
 }
 
-// $otal is an array holding last received values per inverter, indexed by
+// $total is an array holding last received values per inverter, indexed by
 // inverter id. Each value is an array of name => value mappings, where name is:
 // TS, Energy, Power array, Temp, Volt, State
 $total = array();
@@ -61,111 +68,138 @@ $last = 0;
  * Compute aggregate info to send to PVOutput
  * See http://pvoutput.org/help.html#api-addstatus
  */
-function submit($total, $systemid, $apikey) {
+function submit($total, $groups, $systemid, $apikey) {
   // Compute aggragated data: energy, power, avg temp avg volt
   // Power is avg power over the reporting interval
-  $e = 0.0;
-  $p = 0.0;
-  $temp = 0.0;
-  $volt = 0.0;
-  $nonzerocount = 0;
-  $okstatecount = 0;
-  $otherstatecount = 0;
+  $e = array();
+  $p = array();
+  $temp = array();
+  $volt = array();
+  $nonzerocount = array();
+  $okstatecount = array();
+  $otherstatecount = array();
 
-  foreach ($total as $t) {
-    $e += $t['Energy'];
+  $count = is_null($groups) ? 1 : $groups->getCount();
+  for ($i = 0; $i < $count; $i++) {
+    $e[$i] = 0.0;
+    $p[$i] = 0.0;
+    $temp[$i] = 0.0;
+    $volt[$i] = 0.0;
+    $nonzerocount[$i] = 0;
+    $okstatecount[$i] = 0;
+    $otherstatecount[$i] = 0;
+  }
+
+  foreach ($total as $id => $t) {
+    $i = 0;
+    if (!is_null($groups)) {
+      $group = $groups->getGroup($id);
+      $i = $group->getIndex();
+    }
+
+    $e[$i] += $t['Energy'];
     $pp = 0;
     foreach ($t['Power'] as $x)
       $pp += $x;
-    $p += (double)$pp / count($t['Power']);
-    $temp += $t['Temperature'];
+    $p[$i] += (double)$pp / count($t['Power']);
+    $temp[$i] += $t['Temperature'];
 
     if ($pp > 0) {
-      $volt += $t['Volt'];
-      $nonzerocount++;
+      $volt[$i] += $t['Volt'];
+      $nonzerocount[$i]++;
     }
 
     switch ($t['State']) {
     case 0:  // normal, supplying to grid
     case 1:  // not enough light
     case 3:  // other low light condition
-      $okstatecount++;
+      $okstatecount[$i]++;
       break;
     default:
-      $otherstatecount++;
+      $otherstatecount[$i]++;
       break;
-   }
+    }
   }
-  $temp /= count($total);
-  if ($nonzerocount > 0)
-    $volt /= $nonzerocount;
-  $p = round($p);
 
-  if (LIFETIME)
-    report(sprintf('=> PVOutput (%s) v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
-      count($total) == 1 ? $systemid : 'A', $e, $p, $temp, $volt));
-  else
-    report(sprintf('=> PVOutput (%s) v2=%dW v5=%.1fC v6=%.1fV',
-      count($total) == 1 ? $systemid : 'A', $p, $temp, $volt));
-  $time = time();
-  $data = array('d' => strftime('%Y%m%d', $time),
-    't' => strftime('%H:%M', $time),
-    'v2' => $p,
-    'v5' => $temp,
-    'v6' => $volt
-  );
+  for ($i = 0; $i < $count; $i++) {
+    if (!is_null($groups)) {
+      $group = $groups->getGroups()[$i];
+      $systemid = $group->getSystemID();
+      $apikey = $group->getApiKey();
+    }
+
+    $temp[$i] /= (is_null($groups) || $group->getCount() == 0) ?
+      count($total) : $group->getCount();
+    if ($nonzerocount[$i] > 0)
+      $volt[$i] /= $nonzerocount[$i];
+    $p[$i] = round($p[$i]);
+
+    if (LIFETIME)
+      report(sprintf('=> PVOutput (%s) v1=%dWh v2=%dW v5=%.1fC v6=%.1fV',
+        count($total) == 1 ? $systemid : 'A', $e[$i], $p[$i], $temp[$i],
+        $volt[$i]));
+    else
+      report(sprintf('=> PVOutput (%s) v2=%dW v5=%.1fC v6=%.1fV',
+        count($total) == 1 ? $systemid : 'A', $p[$i], $temp[$i], $volt[$i]));
+    $time = time();
+    $data = array('d' => strftime('%Y%m%d', $time),
+      't' => strftime('%H:%M', $time),
+      'v2' => $p[$i],
+      'v5' => $temp[$i],
+      'v6' => $volt[$i]
+    );
 
   // Only send cummulative total energy in LIFETIME mode
-  if (LIFETIME) {
-    $data['v1'] = $e;
-    $data['c1'] = 1;
-  }
-  if (EXTENDED) {
-    report(sprintf('   v7=%d v8=%d v9=%d', $nonzerocount, $okstatecount,
-      $otherstatecount));
-    $data['v7'] = $nonzerocount;
-    $data['v8'] = $okstatecount;
-    $data['v9'] = $otherstatecount;
-  }
+    if (LIFETIME) {
+      $data['v1'] = $e[$i];
+      $data['c1'] = 1;
+    }
+    if (EXTENDED) {
+      report(sprintf('   v7=%d v8=%d v9=%d', $nonzerocount[$i],
+        $okstatecount[$i], $otherstatecount[$i]));
+      $data['v7'] = $nonzerocount[$i];
+      $data['v8'] = $okstatecount[$i];
+      $data['v9'] = $otherstatecount[$i];
+    }
 
-  // We have all the data, prepare POST to PVOutput
-  $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
-    'X-Pvoutput-Apikey: ' . $apikey . "\r\n" .
-    'X-Pvoutput-SystemId: ' . $systemid . "\r\n";
-  $url = 'http://pvoutput.org/service/r2/addstatus.jsp';
-  
-  $data = http_build_query($data, '', '&');
-  $ctx = array('http' => array(
-    'method' => 'POST',
-    'header' => $headers,
-    'content' => $data));
-  $context = stream_context_create($ctx);
-  $fp = fopen($url, 'r', false, $context);
-  if (!$fp)
-    report('POST failed, check your APIKEY=' . $apikey . ' and SYSTEMID=' .
-      $systemid, true);
-  else {
-    $reply = fread($fp, 100);
-    report('<= PVOutput ' . $reply);
-    fclose($fp);
-  }
+    // We have all the data, prepare POST to PVOutput
+    $headers = "Content-type: application/x-www-form-urlencoded\r\n" .
+      'X-Pvoutput-Apikey: ' . $apikey . "\r\n" .
+      'X-Pvoutput-SystemId: ' . $systemid . "\r\n";
+    $url = 'http://pvoutput.org/service/r2/addstatus.jsp';
+    
+    $data = http_build_query($data, '', '&');
+    $ctx = array('http' => array(
+      'method' => 'POST',
+      'header' => $headers,
+      'content' => $data));
+    $context = stream_context_create($ctx);
+    $fp = fopen($url, 'r', false, $context);
+    if (!$fp)
+      report('POST failed, check your APIKEY=' . $apikey . ' and SYSTEMID=' .
+        $systemid, true);
+    else {
+      $reply = fread($fp, 100);
+      report('<= PVOutput ' . $reply);
+      fclose($fp);
+    }
 
-  // Optionally, also to mysql
-  if (MODE == 'AGGREGATE' && defined('MYSQLDB')) {
-    $mvalues = array(
-     'IDDec' => 0,
-     'DCPower' => $p, 
-     'DCCurrent' => 0,
-     'Efficiency' => 0,
-     'ACFreq' => 0,
-     'ACVolt' => $volt,
-     'Temperature' => $temp,
-     'State' => 0
-    );
-    submit_mysql($mvalues, $e);
+    // Optionally, also to mysql
+    if (MODE == 'AGGREGATE' && defined('MYSQLDB')) {
+      $mvalues = array(
+       'IDDec' => 0,
+       'DCPower' => $p[$i], 
+       'DCCurrent' => 0,
+       'Efficiency' => 0,
+       'ACFreq' => 0,
+       'ACVolt' => $volt[$i],
+       'Temperature' => $temp[$i],
+       'State' => 0
+      );
+      submit_mysql($mvalues, $e[$i]);
+    }
   }
-}
-
+} 
 
 
 /*
@@ -176,6 +210,7 @@ function submit_mysql($v, $LifeWh) {
   global $link;
 
   // mysqli.reconnect is false by default
+A
   if (is_resource($link) && !mysqli_ping($link)) {
     mysqli_close($link);
     $link = false;
@@ -214,7 +249,7 @@ function submit_mysql($v, $LifeWh) {
  * Loop processing lines from the gatway
  */
 function process(Connection $conn) {
-  global $total, $last, $systemid, $apikey, $ignored;
+  global $total, $last, $systemid, $apikey, $ignored, $groups;
 
   while (true) {
     $str = $conn->getline();
@@ -300,7 +335,7 @@ function process(Connection $conn) {
         // time to report for this inverter?
         if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 540) {
           $key = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
-          submit(array($total[$id]), $systemid[$id], $key);
+          submit(array($total[$id]), null, $systemid[$id], $key);
           $total[$id]['TS'] = $time;
         }
       } 
@@ -313,7 +348,7 @@ function process(Connection $conn) {
         report('Expecting IDCOUNT=' . IDCOUNT . ' inverter IDs, seen ' .
           count($total) . ' IDs');
       } elseif ($last < $time - 540) {
-        submit($total, SYSTEMID, APIKEY);
+        submit($total, $groups, 0, 0);
         $last = $time;
       }
       if (MODE == 'AGGREGATE')
@@ -475,6 +510,79 @@ class Connection {
 
   public function alive($time) {
     return $this->last_read > $time - 90;
+  }
+}
+
+class Group {
+  private $serials = array();
+  private $systemid;
+  private $apikey;
+  private $index;
+
+  function __construct($sysid, $apikey) {
+    $this->systemid = $sysid;
+    $this->apikey = $apikey;
+  }
+  function addSerial($ser) {
+    $this->serials[] = $ser;
+  }
+
+  function getSystemID() {
+    return $this->systemid;
+  }
+
+  function getApiKey() {
+    return $this->apikey;
+  }
+
+  function isMember($serial) {
+    return in_array($serial, $this->serials);
+  }
+
+  function setIndex($i) {
+    $this->index = $i;
+  }
+
+  function getIndex() {
+    return $this->index;
+  }
+
+  function getCount() {
+    return count($this->serials);
+  }
+}
+
+class Groups {
+  private $groups = array();
+  private $mapping = array();
+
+  function addGroup(Group $grp) {
+    $grp->setIndex(count($this->groups));
+    $this->groups[] = $grp;
+  }
+
+  function getGroups() {
+    return $this->groups;
+  }
+
+  function getCount() {
+    return count($this->groups);
+  }
+
+  function getGroup($serial) {
+    if (!isset($this->mapping[$serial])) {
+      for ($i = 0; $i < count($this->groups); $i++) {
+        $group = $this->groups[$i];
+        if ($group->isMember($serial)) {
+           $this->mapping[$serial] = $i;
+           break;
+        }
+      }
+      if (!isset($mapping[$serial])) {
+        $this->mapping[$serial] = 0;
+      }
+    }
+    return $this->groups[$this->mapping[$serial]];
   }
 }
 ?>
