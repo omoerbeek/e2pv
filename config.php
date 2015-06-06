@@ -31,6 +31,15 @@ $ignored = array(
 // ...
 );
 
+// $g1 = new Group(SYSID1, 'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
+// $g1->addSerial(123456789);
+// $g1->addSerial(234567891);
+// $g2 = new Group(SYSID2, 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii');
+// $g2->addSerial(789123456);
+// $g2->addSerial(562762712);
+// $groups = new Groups();
+// $groups->addGroup($g1);
+// $groups->addGroup($g2);
 
 // Optional MySQL defs, uncomment to enable MySQL inserts, see README.md
 //define('MYSQLHOST', 'localhost');

@@ -201,7 +201,6 @@ function submit($total, $groups, $systemid, $apikey) {
   }
 } 
 
-
 /*
  * Submit data to MySQL
  */
@@ -210,7 +209,6 @@ function submit_mysql($v, $LifeWh) {
   global $link;
 
   // mysqli.reconnect is false by default
-A
   if (is_resource($link) && !mysqli_ping($link)) {
     mysqli_close($link);
     $link = false;
