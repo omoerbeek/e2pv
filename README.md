@@ -124,7 +124,7 @@ $systemid = array(
 ?>
 ```
 Data for inverter `120069930` will be sent to PVOutput SystemID `123456`, etc.
-Aggregated data will also by sent to the main `SYSTEMID`.
+Aggregated data will also be sent to the main `SYSTEMID`.
 If an Enecsys ID is found in the `$apikey` array, output will be
 sent to the corresponding apikey, otherwise it will be sent to the
 default apikey `APIKEY`.
