@@ -314,7 +314,7 @@ function process(Connection $conn) {
       if (count($total) != IDCOUNT) {
         report('Expecting IDCOUNT=' . IDCOUNT . ' inverter IDs, seen ' .
           count($total) . ' IDs');
-      } elseif ($last < $time - 540) {
+      } elseif ($last < $time -300 && $min - 5) {
         submit($total, SYSTEMID, APIKEY);
         $last = $time;
       }
