@@ -296,9 +296,11 @@ function process(Connection $conn) {
       if (defined('MYSQLDB'))
         submit_mysql($v, $LifeWh);
 
+      $min = idate('i') % 10;
       if (MODE == 'SPLIT') {
         // time to report for this inverter?
-        if (!isset($total[$id]['TS']) || $total[$id]['TS'] < $time - 540) {
+        if (!isset($total[$id]['TS']) ||
+          ($total[$id]['TS'] < $time - 300 && $min < 5)) {
           $key = isset($apikey[$id]) ? $apikey[$id] : APIKEY;
           submit(array($total[$id]), $systemid[$id], $key);
           $total[$id]['TS'] = $time;
