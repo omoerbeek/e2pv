@@ -38,7 +38,8 @@ Set `VERBOSE` to 1 if your want the script to print details on what it is doing.
 `SYSTEMID` correspond to your PVOutput api key and System ID.
 `LIFETIME` should be set to `0` if your lifetime kWh values produce wrong
 values. That seems to happen in some installations when panels are producing 
-close to their maximum capacity.
+close to their maximum capacity. Especially duo-inverters seem to have this
+problem.
 By default, the script aggregates data from the inverters and sends 
 a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
