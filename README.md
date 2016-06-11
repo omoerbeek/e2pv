@@ -40,10 +40,12 @@ Set `VERBOSE` to 1 if your want the script to print details on what it is doing.
 values. That seems to happen in some installations when panels are producing 
 close to their maximum capacity. Especially duo-inverters seem to have this
 problem.
-By default, the script aggregates data from the inverters and sends 
+
+The script aggregates data from the inverters and sends 
 a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
+
 By default, the script sends raw DC power data to PVOutput. In a lot of cases
 this data reflects the actually power generated. In some cases, the reported
 data is e few percent too high. In those cases, define `AC` to `1`.
