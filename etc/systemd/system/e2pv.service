@@ -1,0 +1,8 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/home/pi/enecsys/e2pv.sh
+
+[Install]
+WantedBy=default.target

@@ -15,7 +15,7 @@ date.timezone=Europe/Amsterdam
 allow_url_fopen = On
 ```
 # Setup
-Edit the configuration file `config.php`. 
+Edit the configuration file `config.php`.
 ```php
 <?php
 define('VERBOSE', 0);
@@ -37,11 +37,11 @@ Set `VERBOSE` to 1 if your want the script to print details on what it is doing.
 `IDCOUNT` needs to be set to the number of inverters you have. `APIKEY` and
 `SYSTEMID` correspond to your PVOutput api key and System ID.
 `LIFETIME` should be set to `0` if your lifetime kWh values produce wrong
-values. That seems to happen in some installations when panels are producing 
+values. That seems to happen in some installations when panels are producing
 close to their maximum capacity. Especially duo-inverters seem to have this
 problem.
 
-The script aggregates data from the inverters and sends 
+The script aggregates data from the inverters and sends
 a single record to PVOutput every 10 minutes.
 If `EXTENDED` is set to `1`, extra state information is sent to PVOutput. See
 below for details.
@@ -98,7 +98,7 @@ define('MYSQLPORT', '3306');
 # Aggregation vs Splitting
 By default, the script will collect values from the configured number of
 inverters and submit aggregated data to PVOutput. It is possible to also
-send the data from the individual inverters to PVOutput. 
+send the data from the individual inverters to PVOutput.
 
 An example config.php snippet for a split configuration:
 
@@ -137,3 +137,25 @@ of PVOutput. This is no longer required. Actually, having a parent
 structure setup on a system that also gets aggregated info from
 this script likely will cause incorrect data to be collected at
 PVOutput.
+
+# Systemd
+Integration of e2pv into systemd of Raspbian Jessie
+
+1. Make the shell skirpt executabe
+```sh
+chmod 755 e2pv.sh
+```
+2. Copy `e2pv.service` to `/etc/systemd/system/`
+```sh
+sudo cp e2pv.service /etc/systemd/system/
+sudo chmod 644 /etc/systemd/e2pv.service
+```
+3. Reload systemd and enable the service
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable e2pv.service
+```
+4. Start the service
+```sh
+sudo systemctl start e2pv.service
+```
