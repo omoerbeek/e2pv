@@ -142,20 +142,37 @@ PVOutput.
 Integration of e2pv into systemd of Raspbian Jessie
 
 1. Make the shell skirpt executabe
-```sh
+```shell
 chmod 755 e2pv.sh
 ```
 2. Copy `e2pv.service` to `/etc/systemd/system/`
-```sh
+```shell
 sudo cp e2pv.service /etc/systemd/system/
 sudo chmod 644 /etc/systemd/e2pv.service
 ```
 3. Reload systemd and enable the service
-```sh
+```shell
 sudo systemctl daemon-reload
 sudo systemctl enable e2pv.service
 ```
 4. Start the service
-```sh
+```shell
 sudo systemctl start e2pv.service
+```
+
+# Docker
+Build a Docker Container and run it
+
+1. `cd e2pv`
+
+2. Edit the `config.php` file. Add at least the API Key and the System ID
+
+3. Build the Container
+```sh
+docker build -t e2pv .
+```
+
+4. Start the container
+```sh
+docker run -d --rm --name e2pv -p 5040:5040 e2pv
 ```
