@@ -174,5 +174,5 @@ docker build -t e2pv .
 
 4. Start the container
 ```sh
-docker run -d --rm --name e2pv -p 5040:5040 e2pv
+docker run -d --restart always --name e2pv -p 5040:5040 e2pv
 ```
